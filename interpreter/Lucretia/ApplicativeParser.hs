@@ -133,7 +133,8 @@ pBreak = do
   e <- pExp
   return $ EBreak n e
   
--- pLabel :: Name -> Parser Exp
--- pLabel n = pExp >>= return . ELabel n
+
+-- FIXME: replace TAny wityh actual type
+-- pLabel n = pExp >>= return $ ELabel TAny n
 pLabel :: Parser (Name -> Exp)
-pLabel = flip ELabel <$> pExp
+pLabel =  (\e n -> ELabel n TAny e)  <$> pExp

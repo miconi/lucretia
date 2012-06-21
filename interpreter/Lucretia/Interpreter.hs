@@ -288,7 +288,7 @@ eval (ESet n1 n2 e) = do
   updateStore l (VRec (Map.insert n2 v r))
   return v
 eval ENone = return VNone
-eval (ELabel n e) = eval e `catchException` handleBreak n where
+eval (ELabel n t e) = eval e `catchException` handleBreak n where
   handleBreak n (ExcBreak l v) | l == n = return v
   handleBreak n e = throwException e
 eval (EBreak l e) = do
