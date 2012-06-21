@@ -19,7 +19,7 @@ executable Test
   build-depends: 
     HUnit,
     process,
-    either-uwrap >= 1.1,
+    either-unwrap >= 1.1,
     data-lens >= 2.10.0,
     data-lens-template >= 2.1.5,
     data-lens-fd >= 2.0.2
