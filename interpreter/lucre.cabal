@@ -31,6 +31,6 @@ executable Test
     Lucretia.Syntax,
     Lucretia.Types, 
     Lucretia.TypeChecker.TypeChecker,
-    Lucretia.TypeChecker.IsomorphicModuloNames,
+    Lucretia.TypeChecker.MonomorphicModuloNames,
     Lucretia.TypeChecker.Test,
-    DebugUtils, Diff, HUnitUtils, LocalState, OrFail
+    DebugUtils, Diff, HUnitUtils, MonadUtils, OrFail

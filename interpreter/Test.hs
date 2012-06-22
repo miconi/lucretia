@@ -1,4 +1,4 @@
-module Test where
+--module Test where
 
 --import qualified Lucretia.Test(tests)
 import qualified Lucretia.TypeChecker.Test(tests)
