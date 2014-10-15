@@ -16,6 +16,10 @@ type Defs = [Def]
 data Def
   = SetVar  IVar       Exp
   | SetAttr IVar IAttr Exp
+
+  | If IVar Defs Defs
+  | IfHasAttr IVar IAttr Defs Defs
+
   | Return Exp
 
   deriving (Eq, Ord, Show)
@@ -29,9 +33,6 @@ data Exp
 
   | EGetVar  IVar
   | EGetAttr IVar IAttr
-
-  | EIf IVar Defs Defs
-  | EIfHasAttr IVar IAttr Defs Defs
 
   | EFunDef  [IVar] TFun Defs -- f = def (x, y, z) :: (X, Y, Z) [X < {a : Y}, Y < {}, Z < int] -> R [X < {a : Y}, Y < {}, Z < int, R < {b : Z}] { body }
   | EFunCall IVar [IVar] -- f (x, y, z)
