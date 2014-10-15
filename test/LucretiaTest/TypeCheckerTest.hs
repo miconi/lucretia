@@ -277,3 +277,14 @@ bCall_recursive_withParams =
   [ SetVar "i" cInt
   , Return $ EFunCall "f" ["f", "i"]
   ]
+bIf_doubleObjectCreation =
+  [ SetVar "f" $ EFunDef ["cond"] Nothing
+    [ SetVar "x" ENew
+    , If "cond"
+      -- then
+      [ SetAttr "x" "a" ENew ]
+      -- else
+      [ SetAttr "x" "a" ENew ]
+    ]
+  ]
+
