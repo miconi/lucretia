@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
-module Lucretia.TypeChecker.Update ( update, extend ) where
+module Lucretia.TypeChecker.Update ( merge, update, extend ) where
 
 import Data.Map as Map hiding ( filter, update )
 import Data.Set as Set hiding ( filter, update )
@@ -47,6 +47,32 @@ instance Extend TOr where
 instance Extend TSingle where
   extend (TRec r) (TRec r') = TRec $ update r r'
   extend _ t = t
+
+class Merge a where
+  merge :: a -> a -> a
+instance Merge PrePost where
+  merge pp pp' =
+    PrePost ((merge `on` _pre ) pp pp')
+            ((merge `on` _post) pp pp')
+instance Merge Constraints where
+  merge = Map.unionWith merge
+instance Merge TOr where
+  merge = Map.unionWith merge
+instance Merge TSingle where
+  merge (TRec r) (TRec r') = TRec $ merge r r'
+  merge _ t = t -- in case of a function type: just select the second function type. The error will be already thrown when trying to merge two IType's in renaming
+instance Merge TRec where
+  merge = mapCombineWith merge
+instance Merge (Maybe TAttr) where
+  merge (Just (Required, i)) (Just (Required, i')) = if i==i'
+                                                       then Just (Required, i)
+                                                       else error "This should not happen"
+  merge (Just (_       , i)) (Just (_       , i')) = if i==i'
+                                                       then Just (Optional, i)
+                                                       else error "That should not happen"
+  merge  Nothing             (Just (_       , i))         = Just (Optional, i)
+  merge (Just (_       , i))  Nothing                     = Just (Optional, i)
+  
 
 mapCombineWith :: Ord k
                => (Maybe v -> Maybe v -> Maybe v)

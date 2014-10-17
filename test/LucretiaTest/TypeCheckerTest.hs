@@ -70,6 +70,11 @@ outputTypeTestsData =
   , ($(nv 'bCall_recursive), "B with Constraints: [B < int, Env < {f: Z}, Z < func (F) [F < func (F)  -> I ] -> I [F < func (F)  -> I , I < int]]")
   , ($(nv 'bFun_recursive_withParams), "Z with Constraints: [Env < {f: Z}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
   , ($(nv 'bCall_recursive_withParams), "A with Constraints: [A < int, Env < {f: Z, i: A}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
+  , ($(nv 'bIf_doubleObjectCreation), "E with Constraints: [E < func (Acond) [Acond < bool] -> X [Acond < bool, X < {z: Y}, Y < {}], Env < {f: E}]")
+  , ($(nv 'bIf_mergeOfPreviouslyCreatedObjects), "Error: There are multiple variables that should be renamed to Y. Error occured while tried to get renaming from: [Env < {env: X, x: Y, y: Z}, X < {z: Z}, Y < {}, Z < {}] to: [Env < {env: X, x: Y, y: Z}, X < {z: Y}, Y < {}, Z < {}]")
+  , ($(nv 'bIf_undefinedInThen), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
+  , ($(nv 'bIf_undefinedInElse), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
+  , ($(nv 'bIf_preConstraints), "E with Constraints: [E < func (Acond, Ax) [Acond < bool, Ax < {a: X}] -> undefinedId [Acond < bool, Ax < {a: X}, Z < int], Env < {f: E}]")
   --, ($(nv '), "C")
   ]
 
@@ -279,12 +284,61 @@ bCall_recursive_withParams =
   ]
 bIf_doubleObjectCreation =
   [ SetVar "f" $ EFunDef ["cond"] Nothing
-    [ SetVar "x" ENew
+    [ SetVar "env" ENew
     , If "cond"
       -- then
-      [ SetAttr "x" "a" ENew ]
+      [ SetAttr "env" "z" ENew ]
       -- else
-      [ SetAttr "x" "a" ENew ]
+      [ SetAttr "env" "z" ENew ]
+    , Return $ EGetVar "env"
+    ]
+  ]
+bIf_mergeOfPreviouslyCreatedObjects =
+  [ SetVar "f" $ EFunDef ["cond"] Nothing
+    [ SetVar "env" ENew
+    , SetVar "x"   ENew
+    , SetVar "y"   ENew
+    , If "cond"
+      -- then
+      [ SetAttr "env" "z" $ EGetVar "x" ]
+      -- else
+      [ SetAttr "env" "z" $ EGetVar "y" ]
+    , Return $ EGetVar "env"
+    ]
+  ]
+bIf_undefinedInThen =
+  [ SetVar "f" $ EFunDef ["cond"] Nothing
+    [ SetVar "env" ENew
+    , If "cond"
+      -- then
+      [ ]
+      -- else
+      [ SetAttr "env" "z" ENew ]
+    , Return $ EGetVar "env"
+    ]
+  ]
+bIf_undefinedInElse =
+  [ SetVar "f" $ EFunDef ["cond"] Nothing
+    [ SetVar "env" ENew
+    , If "cond"
+      -- then
+      [ SetAttr "env" "z" ENew ]
+      -- else
+      [ ]
+    , Return $ EGetVar "env"
+    ]
+  ]
+bIf_preConstraints =
+  [ SetVar "f" $ EFunDef ["cond", "x"] Nothing
+    [ If "cond"
+      -- then
+      [ Return $ EGetAttr "x" "a"
+      , SetVar "x" cInt
+      ]
+      -- else
+      [ Return $ EGetAttr "x" "a"
+      , SetVar "x" cInt
+      ]
     ]
   ]
 

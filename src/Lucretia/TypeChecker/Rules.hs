@@ -15,6 +15,7 @@ import Data.Map as Map hiding ( update )
 import Data.Set as Set
 import Data.Function ( on )
 
+import Util.Debug ( traceShowIdHlWith )
 import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
@@ -23,8 +24,8 @@ import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
 import Lucretia.TypeChecker.Monad ( freshIType, CM )
-import Lucretia.TypeChecker.Renaming ( applyRenaming, getRenaming, getRenamingOnEnv, freeVariables )
-import Lucretia.TypeChecker.Update ( update, extend )
+import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP )
+import Lucretia.TypeChecker.Update ( merge, update, extend )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
 
@@ -93,6 +94,30 @@ matchDefFresh (SetAttr x a e) cs = do
                                     , toSingletonRec xId a eId
                                     ]
 
+-- TODO If can be an expression
+matchDefFresh (If x b1 b2) cs = do
+  t1 <- matchBlock b1 cs
+  t2 <- matchBlock b2 cs
+  branchesMerged <- mergeTypes t1 t2
+
+  xId <- freshIType
+  bind (isBool x xId) branchesMerged
+
+  where isBool :: IVar -> IType -> PrePost
+        isBool x xId = PrePost cs cs
+          where cs = Map.fromList [ toSingletonRec env x xId
+                                  , xToBool
+                                  ]
+                xToBool = (xId, tOrPrimitive KBool)
+
+        mergeTypes :: Type -> Type -> CM Type
+        mergeTypes (_, pp1) (_, pp2) = do
+          renaming <- pp1 `getRenamingPP` pp2
+          let pp2Renamed = applyRenaming renaming pp2
+          let mergedPP = PrePost ((extend `on` _pre ) pp1 pp2Renamed)
+                                 ((merge  `on` _post) pp1 pp2Renamed)
+          return (undefinedId, mergedPP)
+
 -- | 'match' rules to an @Exp@ producing Type, then rename all @ITypes@ to fresh variables in that type.
 matchExpFresh :: Exp  -> Constraints -> CM Type
 matchExpFresh e cs = do
@@ -148,11 +173,12 @@ matchExp (EFunCall f xsCall) cs = do
     getFunType :: IVar -> Constraints -> CM TFunSingle
     getFunType f cs =
       case f `lookupInEnv` cs of
-        Nothing               -> error $ "Function "++f++" is undefined."
+        Nothing               -> error pleaseDefineSignature
         Just (Optional, _)    -> error $ "Function "++f++" may be undefined."
         Just (Required, ifun) -> case ifun `lookupInConstraints` cs of
            Just tfun -> unwrapFunFromOr tfun
-           Nothing   -> error $ "Please declare signature for the function "++f++". Infering type of a function passed as a parameter to another function (higher order function type inference) is not supported yet."
+           Nothing   -> error pleaseDefineSignature 
+        where pleaseDefineSignature = "Please declare signature for the function "++f++". Infering type of a function passed as a parameter to another function (higher order function type inference) is not supported yet."
 
     unwrapFunFromOr :: TOr -> CM TFunSingle
     unwrapFunFromOr tOr =
@@ -207,9 +233,17 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
     inferSignature :: [IVar] -> Defs -> CM TFunSingle
     inferSignature argNames funBody = do
+      funType <- matchBlock funBody emptyConstraints
+
       let argTypes = fmap (\n -> "A"++n) argNames
       let argCs = addArgsCs argNames argTypes emptyConstraints
-      matchBody funBody argTypes argCs
+
+      (funReturnId, funBodyPP) <- bind (PrePost emptyConstraints argCs) funType
+
+      checkEmptyPreEnv funBodyPP
+      let funBodyNoEnvPP = eraseEnv funBodyPP
+      -- TODO clean constraints
+      return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
 
     matchBody :: Defs -> [IType] -> Constraints -> CM TFunSingle
     matchBody funBody argTypes argCs = do
@@ -219,15 +253,14 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       -- TODO clean constraints
       return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
 
-        where
-        -- | Checks that no variable was referenced, apart from the arguments
-        checkEmptyPreEnv :: PrePost -> CM ()
-        checkEmptyPreEnv pp = (getEnv (_pre pp) == emptyRec) `orFail` "Inside a function body a variable was referenced which was not defined and is not in the function's parameters."
+    -- | Checks that no variable was referenced, apart from the arguments
+    checkEmptyPreEnv :: PrePost -> CM ()
+    checkEmptyPreEnv pp = (getEnv (_pre pp) == emptyRec) `orFail` "Inside a function body a variable was referenced which was not defined and is not in the function's parameters."
 
-        eraseEnv :: PrePost -> PrePost
-        eraseEnv (PrePost pre post) = PrePost (eraseEnv' pre) (eraseEnv' post)
-        eraseEnv' :: Constraints -> Constraints
-        eraseEnv' = Map.delete env
+    eraseEnv :: PrePost -> PrePost
+    eraseEnv (PrePost pre post) = PrePost (eraseEnv' pre) (eraseEnv' post)
+    eraseEnv' :: Constraints -> Constraints
+    eraseEnv' = Map.delete env
 
 addArgsPP :: [IAttr] -> [IType] -> PrePost -> PrePost
 addArgsPP argNames argTypes (PrePost pre post) =
@@ -274,28 +307,3 @@ instance InheritPP FunPrePost where
   inherit pp other = other
 
 
--- 
--- matchExp _ (EIf x e1 e2) = do
---   (t1, pp1) <- matchExp e1 env
---   (t2, pp2) <- matchExp e2 env
---   let branchesMerged = ( mergeT  t1  t2
---                        , mergePP pp1 pp2 )
---   bind (isBool x) branchesMerged
--- 
--- isBool :: IVar -> CM Type
--- isBool x = return ("dummy", PrePost constraints constraints)
---   where constraints :: Constraints
---         constraints = Map.fromList [ envToX x
---                                    , xToBool
---                                    ]
---         envToX  = (env, tOrSingletonRec x (Required, xId))
---         xToBool = (xId, tOrPrimitive KBool)
---
---
--- merge ::
--- merge = do
---   Rename pp2 to pp1
---   merge
---   guard $ t1 = rename t2
---   return (t1, mergedPP)
---

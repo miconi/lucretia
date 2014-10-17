@@ -8,7 +8,7 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
 --module Lucretia.TypeChecker.Renaming where
-module Lucretia.TypeChecker.Renaming ( freeVariables, getRenamingOnEnv, getRenaming, applyRenaming ) where
+module Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP ) where
 
 import Prelude hiding ( any, sequence )
 
@@ -23,7 +23,7 @@ import Data.Tuple ( swap )
 import Control.Monad.Error ( runErrorT, throwError, ErrorT )
 import Control.Monad.Identity ( runIdentity, Identity )
 import Control.Monad.State ( execStateT, get, lift, modify, StateT )
-import Control.Monad.Trans.Reader ( asks, ReaderT, runReaderT )
+import Control.Monad.Trans.Reader ( ask, asks, ReaderT, runReaderT )
 import Data.Traversable ( sequence )
 
 import Util.Map ( findAll )
@@ -59,6 +59,9 @@ instance FreeVariables TAttr where
 --
 -- Also serves as a list of visited node pairs.
 type Renaming = Set (IType, IType)
+
+emptyRenaming :: Renaming
+emptyRenaming = Set.empty
 
 -- | Rename using renaming
 applyRenaming :: ApplyRenaming t
@@ -106,7 +109,15 @@ instance ApplyRenaming TFunSingle where
       (ar f ppF)
  
 getRenamingOnEnv :: Constraints -> Constraints -> CM Renaming
-getRenamingOnEnv = getRenaming `on` \cs -> (getEnv cs, cs)
+getRenamingOnEnv = getRenamingOnEnvWith emptyRenaming
+
+getRenamingOnEnvWith :: Renaming -> Constraints -> Constraints -> CM Renaming
+getRenamingOnEnvWith renaming = getRenamingWith renaming `on` \cs -> (getEnv cs, cs)
+
+getRenamingPP :: PrePost -> PrePost -> CM Renaming
+getRenamingPP (PrePost pre post) (PrePost pre' post') = do
+  renaming <- getRenamingOnEnv pre pre'
+  getRenamingOnEnvWith renaming post post'
 
 class GetRenaming a where
   -- | Gets all possible renamings.
@@ -114,10 +125,13 @@ class GetRenaming a where
   getRenaming :: (a, Constraints) -- ^ @a@ at the place of call
               -> (a, Constraints) -- ^ @a@ at the place of declaration
               -> CM Renaming       -- ^ Possible renamings
-  (a, cs) `getRenaming` (a', cs') = lift $ execStateT (runReaderT (r a a') (cs, cs')) emptyRenaming
+  getRenaming = getRenamingWith emptyRenaming
 
-    where
-    emptyRenaming = Set.empty
+  getRenamingWith :: Renaming
+                  -> (a, Constraints)
+                  -> (a, Constraints)
+                  -> CM Renaming
+  getRenamingWith renaming (a, cs) (a', cs') = lift $ execStateT (runReaderT (r a a') (cs, cs')) renaming
 
   r :: a -- ^ Get renaming to this …
     -> a -- ^ … from that.
@@ -145,9 +159,7 @@ instance GetRenaming IType where
 
       checkRecursively i i' = do
         visited <- getVisited
-        ((i, i') `neitherMemberOf` visited) `orFail`
-          ("There is already a renaming to "++i++" or from "++i')
-
+        ((i, i') `neitherMemberOf` visited)
         modify $ Set.insert (i, i')
         t  <- getITypeFromConstraints i  fst
         t' <- getITypeFromConstraints i' snd
@@ -157,10 +169,12 @@ instance GetRenaming IType where
         cs <- asksConstraints which
         return $ Map.lookup i cs
 
-      neitherMemberOf :: (IType, IType) -> Renaming -> Bool
-      (i, i') `neitherMemberOf` visited =
-        not (memberFst i  visited) &&
-        not (memberSnd i' visited)
+      neitherMemberOf :: (IType, IType) -> Renaming -> M ()
+      (i, i') `neitherMemberOf` visited = do
+        cs <- ask
+        let errorDetails = ". Error occured while tried to get renaming from: "++showConstraints (snd cs)++ " to: "++showConstraints (fst cs)
+        not (memberFst i  visited) `orFail` ("There are multiple variables that should be renamed to "++i++errorDetails)
+        not (memberSnd i' visited) `orFail` ("There are multiple variables that should be renamed from "++i'++errorDetails)
         where
         memberFst :: (Eq a, Foldable f) => a -> f (a, b) -> Bool
         memberFst x = any $ \(y, _) -> x == y
