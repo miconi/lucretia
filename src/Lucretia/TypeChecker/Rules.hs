@@ -215,9 +215,15 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       -- of the functions passed as parameters
       let ppInherited = inheritPP ppDecl
       let argCs = addArgsCs argNames argTypes (_pre ppInherited)
-      TFunSingle _ iInfered (DeclaredPP ppInfered) <- matchBody funBody argTypes argCs
-      checkPre ppInherited ppInfered
-      checkPost argNames iInfered (_post ppInfered) iDecl (_post ppInherited)
+
+      (iInfered, ppInfered) <- matchBlock funBody argCs
+
+      checkEmptyPreEnv ppInfered
+      let ppInferedNoEnv = eraseEnv ppInfered
+
+      checkPre ppInherited ppInferedNoEnv
+      checkPost argNames iInfered (_post ppInferedNoEnv) iDecl (_post ppInherited)
+
       -- TODO clean constraints
       return decl
 
@@ -242,14 +248,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
       checkEmptyPreEnv funBodyPP
       let funBodyNoEnvPP = eraseEnv funBodyPP
-      -- TODO clean constraints
-      return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
 
-    matchBody :: Defs -> [IType] -> Constraints -> CM TFunSingle
-    matchBody funBody argTypes argCs = do
-      (funReturnId, funBodyPP) <- matchBlock funBody argCs
-      checkEmptyPreEnv funBodyPP
-      let funBodyNoEnvPP = eraseEnv funBodyPP
       -- TODO clean constraints
       return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
 
