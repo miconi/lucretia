@@ -64,16 +64,14 @@ instance Merge TSingle where
 instance Merge TRec where
   merge = mapCombineWith merge
 instance Merge (Maybe TAttr) where
-  merge (Just (Required, i)) (Just (Required, i')) = if i==i'
-                                                       then Just (Required, i)
-                                                       else error assertion
-  merge (Just (_       , i)) (Just (_       , i')) = if i==i'
-                                                       then Just (Optional, i)
-                                                       else error assertion
-  merge  Nothing             (Just (_       , i))         = Just (Optional, i)
-  merge (Just (_       , i))  Nothing                     = Just (Optional, i)
+  -- IType pointers should be the same here.
+  -- Renaming should throw an error when corresponding ITypes
+  -- from 'then' & 'else' branches cannot be renamed to the same variable.
+  merge (Just (Required, i)) (Just (Required, i')) | i==i' = Just (Required, i)
+  merge (Just (_       , i)) (Just (_       , i')) | i==i' = Just (Optional, i)
+  merge  Nothing             (Just (_       , i))          = Just (Optional, i)
+  merge (Just (_       , i))  Nothing                      = Just (Optional, i)
 
-  where assertion = "IType pointers should be the same here. Renaming should throw an error when corresponding ITypes from 'then' & 'else' branches cannot be renamed to the same variable."
 
 mapCombineWith :: Ord k
                => (Maybe v -> Maybe v -> Maybe v)
