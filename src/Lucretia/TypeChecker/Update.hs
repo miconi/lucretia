@@ -9,9 +9,12 @@
 
 module Lucretia.TypeChecker.Update ( merge, update, extend ) where
 
+import Data.Map ( Map )
 import Data.Map as Map hiding ( filter, update )
 import Data.Set as Set hiding ( filter, update )
 import Data.Function ( on )
+
+import Util.Map ( mapCombineWith )
 
 import Lucretia.Language.Definitions
 import Lucretia.Language.Types
@@ -26,6 +29,7 @@ instance Update TOr where
   update = mapCombineWith update
 instance Update (Maybe TSingle) where
   update (Just (TRec r)) (Just (TRec r')) = Just $ TRec (update r r')
+  -- TODO update (Just (TRec r)) Nothing = Just $ TRec r
   update _ t' = t'
 instance Update TRec where
   update = Map.unionWith update
@@ -33,6 +37,7 @@ instance Update TAttr where
   update _                t'@(Required, _)  = t'
   update (definedness, i)    (Optional, i') = (definedness, merge i i')
     where merge i i' = if i == i' then i else undefinedId
+          -- HERE TODO should throw an error: cannot merge when overriding a type pointer with an different optional type pointer
   -- IType must match in both sides
 
 -- | The only difference between update & extend is that:
@@ -48,6 +53,9 @@ instance Extend TSingle where
   extend (TRec r) (TRec r') = TRec $ update r r'
   extend _ t = t
 
+-- | The only difference between extend & merge is that:
+-- extend adds       attributes in TRec, while
+-- merge  intersects attributes in TRec
 class Merge a where
   merge :: a -> a -> a
 instance Merge PrePost where
@@ -67,34 +75,10 @@ instance Merge (Maybe TAttr) where
   -- IType pointers should be the same here.
   -- Renaming should throw an error when corresponding ITypes
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
+  -- But the error is found earlier, by checking that the renaming for variables
+  -- not in the set of fresh variables created in the if branches.
   merge (Just (Required, i)) (Just (Required, i')) | i==i' = Just (Required, i)
   merge (Just (_       , i)) (Just (_       , i')) | i==i' = Just (Optional, i)
   merge  Nothing             (Just (_       , i))          = Just (Optional, i)
   merge (Just (_       , i))  Nothing                      = Just (Optional, i)
-
-
-mapCombineWith :: Ord k
-               => (Maybe v -> Maybe v -> Maybe v)
-               -> Map k v -> Map k v -> Map k v
-mapCombineWith combine m m' =
-  Map.fromList $
-    filterJust $
-      fmap (applyCombine combine m m') $
-        Set.toList $ allKeys m m'
-  where allKeys :: Ord k => Map k v -> Map k v -> Set k
-        allKeys = Set.union `on` keysSet
-        applyCombine :: Ord k
-                     => (Maybe v -> Maybe v -> Maybe v)
-                     -> Map k v -> Map k v
-                     -> k
-                     -> (k, Maybe v)
-        applyCombine combine m m' k =
-          ( k
-          , (combine `on` Map.lookup k) m m'
-          )
-        filterJust :: [(k, Maybe v)] -> [(k, v)]
-        filterJust xs = fmap (\(k, Just v) -> (k, v)) $ filter isJust xs
-        isJust :: (k, Maybe v) -> Bool
-        isJust (_, Just _ ) = True
-        isJust (_, Nothing)  = False
 

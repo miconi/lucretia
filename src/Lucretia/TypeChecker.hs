@@ -6,7 +6,7 @@
 -- TypeChecker runner
 -----------------------------------------------------------------------------
 --module Lucretia.TypeChecker where
-module Lucretia.TypeChecker ( typeProgramme ) where
+module Lucretia.TypeChecker ( typeProgramme, typeBlock ) where
 
 import Control.Monad.State ( lift )
 import Data.Map as Map hiding ( update )
@@ -33,5 +33,9 @@ typeProgrammeM b = do
   return (id, post)
 
     where expectEmptyPreconditionsIn pre =
-            (pre == emptyConstraints) `orFail` "Inside the main programme body a variable was referenced which was not defined."
+            (pre == emptyConstraints) `orFail` ("Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: " ++ showConstraints pre)
+
+-- | Function for testing purposes, gets Pre- & Post-Constraints for a given block
+typeBlock :: Defs -> Either ErrorMsg Type
+typeBlock b = evalCM $ matchBlock b emptyConstraints
 

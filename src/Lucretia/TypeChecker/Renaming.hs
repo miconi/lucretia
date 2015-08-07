@@ -8,7 +8,7 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
 --module Lucretia.TypeChecker.Renaming where
-module Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP ) where
+module Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming ) where
 
 import Prelude hiding ( any, sequence )
 
@@ -38,6 +38,8 @@ import Lucretia.TypeChecker.Monad ( CM )
 -- | Get all free occuring variables.
 class FreeVariables a where
   freeVariables :: a -> Set IType
+instance FreeVariables Renaming where
+  freeVariables r = Set.map fst r `Set.union` Set.map snd r
 instance FreeVariables FunPrePost where
   freeVariables (DeclaredPP pp) = freeVariables pp
   freeVariables InheritedPP = Set.empty
@@ -120,7 +122,8 @@ getRenamingPP (PrePost pre post) (PrePost pre' post') = do
   getRenamingOnEnvWith renaming post post'
 
 class GetRenaming a where
-  -- | Gets all possible renamings.
+  -- | Gets renaming.
+  -- Resulting Renaming does not contain identity pairs.
   -- Expected condition should be w or equal to actual condition.
   getRenaming :: (a, Constraints) -- ^ @a@ at the place of call
               -> (a, Constraints) -- ^ @a@ at the place of declaration
@@ -131,7 +134,11 @@ class GetRenaming a where
                   -> (a, Constraints)
                   -> (a, Constraints)
                   -> CM Renaming
-  getRenamingWith renaming (a, cs) (a', cs') = lift $ execStateT (runReaderT (r a a') (cs, cs')) renaming
+  getRenamingWith renaming (a, cs) (a', cs') = fmap removeIdentities $ lift $ execStateT (runReaderT (r a a') (cs, cs')) renaming
+    where
+    -- The Renaming property that it has no identity pairs is used in the implementation of the if rule.
+    removeIdentities :: Renaming -> Renaming
+    removeIdentities = Set.filter (\(x, y) -> not $ x == y)
 
   r :: a -- ^ Get renaming to this …
     -> a -- ^ … from that.
@@ -203,6 +210,8 @@ instance GetRenaming [TAttr] where
   r (i:is) (i':is') = r i i' >> r is is'
   r []     []       = ok
 instance GetRenaming TAttr where
+  r (_, t) (_, t') | t == t' = ok
+  r (_, t) (Optional, t') = ok -- TODO what here (ok or error)
   r (_, t) (_, t') = r t t'
 
 

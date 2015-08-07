@@ -15,7 +15,7 @@ import Util.HUnit                       ( assertEqualShowingDiff, hUnitTestsToFr
 import Util.VariableName                ( nv )
 
 import Lucretia.Language.Definitions
-import Lucretia.TypeChecker             ( typeProgramme )
+import Lucretia.TypeChecker             ( typeProgramme, typeBlock )
 import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
@@ -43,9 +43,10 @@ outputTypeTestsData =
   , ($(nv 'bSetVar_x__Get_x), "X with Constraints: [Env < {x: X}, X < int]")
   , ($(nv 'bSetVar_x_to_x), "X with Constraints: [Env < {x: X}, X < int]")
   , ($(nv 'bSetVar_xy__Get_y), "Y with Constraints: [Env < {x: X, y: Y}, X < int, Y < string]")
-  , ($(nv 'bGetUndefinedVar), "Error: Inside the main programme body a variable was referenced which was not defined.")
+  , ($(nv 'bGetUndefinedVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: X}]")
   , ($(nv 'bNew), "X with Constraints: [Env < {}, X < {}]")
-  , ($(nv 'bGetAttr_noVar), "Error: Inside the main programme body a variable was referenced which was not defined.")
+  , ($(nv 'bGetUndefinedAttr), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {a: Y}]")
+  , ($(nv 'bGetAttr_noVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: Y}, Y < {a: X}]")
   , ($(nv 'bGetAttr_varNotRec), "Error: Type: int should be weaker (have less possible types) then: {a: Y}")
   , ($(nv 'bSetAttr_xa), "Y with Constraints: [Env < {x: X}, X < {a: Y}, Y < int]")
   , ($(nv 'bSetAttr_xab), "A with Constraints: [A < string, Env < {x: X}, X < {a: Y, b: A}, Y < int]")
@@ -72,10 +73,21 @@ outputTypeTestsData =
   , ($(nv 'bCall_recursive_withParams), "A with Constraints: [A < int, Env < {f: Z, i: A}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
   , ($(nv 'bIf_doubleObjectCreation), "E with Constraints: [E < func (Acond) [Acond < bool] -> X [Acond < bool, X < {z: Y}, Y < {}], Env < {f: E}]")
   , ($(nv 'bIf_mergeOfPreviouslyCreatedObjects), "Error: There are multiple variables that should be renamed to Y. Error occured while tried to get renaming from: [Env < {env: X, x: Y, y: Z}, X < {z: Z}, Y < {}, Z < {}] to: [Env < {env: X, x: Y, y: Z}, X < {z: Y}, Y < {}, Z < {}]")
-  , ($(nv 'bIf_undefinedInThen), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
-  , ($(nv 'bIf_undefinedInElse), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
+  , ($(nv 'bIf_attrUndefinedInThen), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
+  , ($(nv 'bIf_attrUndefinedInElse), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
+  , ($(nv 'bIf_varUndefinedInThen), "undefinedId with Constraints: [Env < {cond: X, optional x: Y}, X < bool, Y < {}]")
+  , ($(nv 'bIf_varUndefinedInThen_returnVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: Y}]")
   , ($(nv 'bIf_preConstraints), "E with Constraints: [E < func (Acond, Ax) [Acond < bool, Ax < {a: X}] -> undefinedId [Acond < bool, Ax < {a: X}, Z < int], Env < {f: E}]")
-  --, ($(nv '), "C")
+  , ($(nv 'bIf_varDefinedInBoth_inFunction), "B with Constraints: [B < func (Acond, Ay) [Acond < bool] -> X [Acond < bool, X < {}], Env < {f: B}]")
+  , ($(nv 'bGetUndefinedVar_inFunction), "Error: Inside a function body a variable was referenced which may be undefined and is not in the function parameters.")
+  , ($(nv 'bIf_varUndefinedInThen_inFunction), "Error: Inside a function body a variable was referenced which may be undefined and is not in the function parameters.")
+  , ($(nv 'bIf_reassignInOneBranchWithNew), "Error: Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else').")
+  , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf), "Error: There are multiple variables that should be renamed from Y. Error occured while tried to get renaming from: [Env < {cond: Z, x: Y, y: Y}, X < {}, Y < {}, Z < bool] to: [Env < {cond: Z, x: X, y: Y}, X < {}, Y < {}, Z < bool]")
+  , ($(nv 'bIf_reassignInBothBranchesWithNew), "Z with Constraints: [Env < {cond: Y, x: Z}, X < {}, Y < bool, Z < {}]")
+  , ($(nv 'bIf_reassignInOneBranchWithNew_inFunction), "C")
+  , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction), "C")
+  , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "C")
+  -- , ($(nv '), "C")
   ]
 
 --bSetVar_x, bSetVar_xGet_x, bSetVar_xyGet_y, bGetUndefinedVar, bNew :: Defs
@@ -104,6 +116,10 @@ bGetUndefinedVar =
   ]
 bNew =
   [ Return ENew
+  ]
+bGetUndefinedAttr = 
+  [ SetVar "x" ENew
+  , Return $ EGetAttr "x" "a"
   ]
 bGetAttr_noVar =
   [ Return $ EGetAttr "x" "a"
@@ -306,7 +322,7 @@ bIf_mergeOfPreviouslyCreatedObjects =
     , Return $ EGetVar "env"
     ]
   ]
-bIf_undefinedInThen =
+bIf_attrUndefinedInThen =
   [ SetVar "f" $ EFunDef ["cond"] Nothing
     [ SetVar "env" ENew
     , If "cond"
@@ -317,7 +333,30 @@ bIf_undefinedInThen =
     , Return $ EGetVar "env"
     ]
   ]
-bIf_undefinedInElse =
+bIf_attrUndefinedInElse =
+  [ SetVar "f" $ EFunDef ["cond"] Nothing
+    [ SetVar "env" ENew
+    , If "cond"
+      -- then
+      [ SetAttr "env" "z" ENew ]
+      -- else
+      [ ]
+    , Return $ EGetVar "env"
+    ]
+  ]
+bIf_varUndefinedInThen =
+    [ SetVar "cond" (EBool True)
+    , If "cond"
+      -- then
+      [ ]
+      -- else
+      [ SetVar "x" ENew ]
+    ]
+bIf_varUndefinedInThen_returnVar =
+  bIf_varUndefinedInThen ++
+  [ Return $ EGetVar "x"
+  ]
+bIf_varUndefinedInElse =
   [ SetVar "f" $ EFunDef ["cond"] Nothing
     [ SetVar "env" ENew
     , If "cond"
@@ -341,4 +380,77 @@ bIf_preConstraints =
       ]
     ]
   ]
-
+bIf_varDefinedInBoth_inFunction =
+  [ SetVar "f" $ EFunDef ["cond", "y"] Nothing
+    [ If "cond"
+      -- then
+      [ SetVar "x" ENew ]
+      -- else
+      [ SetVar "x" ENew ]
+    , Return $ EGetVar "x"
+    ]
+  ]
+bGetUndefinedVar_inFunction =
+  [ SetVar "f" $ EFunDef [] Nothing
+    [ Return $ EGetVar "x"
+    ]
+  ]
+bIf_varUndefinedInThen_inFunction =
+  [ SetVar "f" $ EFunDef ["cond", "y"] Nothing
+    [ If "cond"
+      -- then
+      [ ]
+      -- else
+      [ SetVar "x" ENew ]
+    , Return $ EGetVar "x"
+    ]
+  ]
+bIf_reassignInOneBranchWithNew =
+  [ SetVar "x" ENew
+  , SetVar "cond" (EBool True)
+  , If "cond" [ ] [ SetVar "x" ENew ]
+  , Return $ EGetVar "x"
+  ]
+bIf_reassignInOneBranchWithNewCreatedOutsideOfIf =
+  [ SetVar "x" ENew
+  , SetVar "y" ENew
+  , SetVar "cond" (EBool True)
+  , If "cond" [ ] [ SetVar "x" $ EGetVar "y" ]
+  , Return $ EGetVar "x"
+  ]
+bIf_reassignInBothBranchesWithNew =
+  [ SetVar "x" ENew
+  , SetVar "cond" (EBool True)
+  , If "cond" [ SetVar "x" ENew ] [ SetVar "x" ENew ]
+  , Return $ EGetVar "x"
+  ]
+bIf_reassignInOneBranchWithNew_inFunction =
+  [ SetVar "f" $ EFunDef ["x"] Nothing
+    [ SetVar "cond" (EBool True)
+    , If "cond" [ ] [ SetVar "x" ENew ]
+    , Return $ EGetVar "x"
+    ]
+  , SetVar "xx" ENew
+  , Return $ EFunCall "f" ["xx"]
+  ]
+bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction =
+  [ SetVar "f" $ EFunDef ["x"] Nothing
+    [ SetVar "cond" (EBool True)
+    , SetVar "y" ENew
+    , If "cond" [ ] [ SetVar "x" $ EGetVar "y" ]
+    ]
+  , SetVar "xx" ENew
+  , Return $ EFunCall "f" ["xx"]
+  ]
+bIf_reassignInBothBranchesWithNew_inFunction =
+  [ SetVar "f" $ EFunDef ["x"] Nothing
+    [ SetVar "cond" (EBool True)
+    , If "cond" [ SetVar "x" ENew ] [ SetVar "x" ENew ]
+    , Return $ EGetVar "x"
+    ]
+  , SetVar "xx" ENew
+  , Return $ EFunCall "f" ["xx"]
+  ]
+  -- TODO fix bug: Should fail on merging two different type variables ("X" update "optional Y"):
+  -- required X - when "x" is declared as a parameter
+  -- optional Y - when "x" is being assigned in only one branch of the if-instruction

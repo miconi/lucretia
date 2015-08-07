@@ -24,7 +24,7 @@ import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
 import Lucretia.TypeChecker.Monad ( freshIType, CM )
-import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP )
+import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming )
 import Lucretia.TypeChecker.Update ( merge, update, extend )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
@@ -38,7 +38,7 @@ matchBlock xs post = matchBlockT xs (undefinedId, PrePost emptyConstraints post)
 -- B ...
 -- B xN
 --   x
-matchBlockT :: Defs -> Type -> CM Type
+matchBlockT :: Defs -> Type -> CM Type -- TODO OPT RTR IType to (Maybe IType)
 matchBlockT [] t = return t
 matchBlockT (x:xs) (_, pp) = do
   xT     <- matchDefFresh x (_post pp)
@@ -51,7 +51,7 @@ bind ppCall (iDecl, ppDecl) = do
   let ppRenamed  = applyRenaming renaming ppDecl
 
   toWeaken      <- _post ppCall `weaker` _pre ppRenamed
-  let preMerged  = _pre  ppCall `extend` toWeaken
+  let preMerged  = _pre  ppCall `extend` toWeaken -- TODO toWeaken `update` ppCall
   -- Q why not:    _post ppCall `extend` toWeaken
   -- A toWeaken is already inside _post ppRenamed
   -- because: toWeaken `isSubsetOf` _pre ppRenamed && _pre ppRenamed `isSubsetOf` _post ppRenamed
@@ -98,7 +98,7 @@ matchDefFresh (SetAttr x a e) cs = do
 matchDefFresh (If x b1 b2) cs = do
   t1 <- matchBlock b1 cs
   t2 <- matchBlock b2 cs
-  branchesMerged <- mergeTypes t1 t2
+  branchesMerged <- mergeTypes cs t1 t2
 
   xId <- freshIType
   bind (isBool x xId) branchesMerged
@@ -110,13 +110,19 @@ matchDefFresh (If x b1 b2) cs = do
                                   ]
                 xToBool = (xId, tOrPrimitive KBool)
 
-        mergeTypes :: Type -> Type -> CM Type
-        mergeTypes (_, pp1) (_, pp2) = do
+        mergeTypes :: Constraints -> Type -> Type -> CM Type
+        mergeTypes cs (_, pp1) (_, pp2) = do
           renaming <- pp1 `getRenamingPP` pp2
+          renamingOnlyOnVariablesCreatedInScope cs renaming `orFail` "Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else')."
           let pp2Renamed = applyRenaming renaming pp2
-          let mergedPP = PrePost ((extend `on` _pre ) pp1 pp2Renamed)
+          let mergedPP = PrePost ((extend `on` _pre ) pp1 pp2Renamed) --TODO preconditions in TOr should be intersected
                                  ((merge  `on` _post) pp1 pp2Renamed)
           return (undefinedId, mergedPP)
+
+            where
+            renamingOnlyOnVariablesCreatedInScope :: Constraints -> Renaming -> Bool
+            renamingOnlyOnVariablesCreatedInScope cs r =
+              freeVariables cs `Set.intersection` freeVariables r == Set.empty
 
 -- | 'match' rules to an @Exp@ producing Type, then rename all @ITypes@ to fresh variables in that type.
 matchExpFresh :: Exp  -> Constraints -> CM Type
@@ -254,7 +260,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
     -- | Checks that no variable was referenced, apart from the arguments
     checkEmptyPreEnv :: PrePost -> CM ()
-    checkEmptyPreEnv pp = (getEnv (_pre pp) == emptyRec) `orFail` "Inside a function body a variable was referenced which was not defined and is not in the function's parameters."
+    checkEmptyPreEnv pp = (getEnv (_pre pp) == emptyRec) `orFail` "Inside a function body a variable was referenced which may be undefined and is not in the function parameters."
 
     eraseEnv :: PrePost -> PrePost
     eraseEnv (PrePost pre post) = PrePost (eraseEnv' pre) (eraseEnv' post)

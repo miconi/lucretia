@@ -9,14 +9,15 @@
 module Lucretia.TypeChecker.Weakening ( checkWeaker, weaker ) where
 
 import Data.Map ( Map )
-import Data.Map as Map
+import Data.Map as Map hiding ( update )
 import Data.Set ( Set )
-import Data.Set as Set
+import Data.Set as Set hiding ( filter, update )
 import Data.Function ( on )
 
 import Prelude hiding ( sequence )
 import Data.Traversable ( sequence )
 
+import Util.Map ( mapCombineWith, mapFromMaybe, nonEmpty )
 import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
@@ -66,21 +67,25 @@ instance Weaker TOr where
     rec <- (w `on` Map.lookup KRec) m m'
     return $ mapFromMaybe KRec rec
 
-mapFromMaybe :: Ord k => k -> Maybe v -> Map k v
-mapFromMaybe k v =
-    Map.alter (\_ -> v) k Map.empty
-
 instance Weaker (Maybe TSingle) where
-  w (Just (TRec s)) (Just (TRec s')) = return $
-    if nonEmpty difference
-      then Just $ TRec difference
-      else Nothing
-    where difference = s' `Map.difference` s
-  w Nothing _ = return Nothing
+  w (Just (TRec s)) (Just (TRec s')) =
+    return $ if Map.null attributesToAdd
+               then Nothing
+               else Just (TRec attributesToAdd)
+    where attributesToAdd = mapCombineWith wTAttr s s'
+  w Nothing _ = return Nothing -- HERE Q: why Nothing as the left parameter?
   -- cannot be otherwise since:
   -- * types in "m :: TOr" are subset of types in "m' :: TOr": Set.isSubsetOf `on` Map.keys $ m m'
   -- * "w" on "Maybe TSingle" parameters are TRecs: rec <- (w `on` Map.lookup KRec) m m'
 
-nonEmpty :: Map k v -> Bool
-nonEmpty = not . Map.null
+wTAttr :: Maybe TAttr -> Maybe TAttr -> Maybe TAttr
+-- Nothing as a result means that the 'weaker' relation holds
+-- (without a need to add any conditions).
+-- wTAttr Nothing Nothing = Nothing -- commented out because Nothing from both maps is not possible
+wTAttr Nothing t = t
+-- IType pointers should be the same here.
+-- Renaming should throw an error when corresponding ITypes
+-- from 'then' & 'else' branches cannot be renamed to the same variable.
+wTAttr (Just (Optional, i)) (Just (Required, i')) | i==i' = Just (Required, i)
+wTAttr _ _ = Nothing
 

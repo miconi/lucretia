@@ -45,6 +45,7 @@ library
                         Util.Debug,
                         Util.Diff,
                         Util.HUnit,
+                        Util.Map,
                         Util.MapLenses,
                         Util.Monad,
                         Util.OrFail,
