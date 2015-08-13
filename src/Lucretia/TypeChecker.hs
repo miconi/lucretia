@@ -8,9 +8,6 @@
 --module Lucretia.TypeChecker where
 module Lucretia.TypeChecker ( typeProgramme, typeBlock ) where
 
-import Control.Monad.State ( lift )
-import Data.Map as Map hiding ( update )
-
 import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
@@ -19,8 +16,6 @@ import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( CM, evalCM, initState )
 import Lucretia.TypeChecker.Rules ( matchBlock )
-import Lucretia.TypeChecker.Update ( update, extend )
-import Lucretia.TypeChecker.Weakening ( weaker )
 
 
 typeProgramme :: Defs -> ProgrammeType

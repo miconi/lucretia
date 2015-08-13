@@ -210,8 +210,6 @@ instance GetRenaming [TAttr] where
   r (i:is) (i':is') = r i i' >> r is is'
   r []     []       = ok
 instance GetRenaming TAttr where
-  r (_, t) (_, t') | t == t' = ok
-  r (_, t) (Optional, t') = ok -- TODO what here (ok or error)
   r (_, t) (_, t') = r t t'
 
 

@@ -3,82 +3,87 @@
 -- Copyright   :  (c) Michał Oniszczuk 2011 - 2014
 -- Maintainer  :  michal.oniszczuk@gmail.com
 --
--- Update- & Extend- Constraints rules.
+-- Type update & merge rules.
 -----------------------------------------------------------------------------
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, TypeSynonymInstances #-}
 
-module Lucretia.TypeChecker.Update ( merge, update, extend ) where
+module Lucretia.TypeChecker.Update ( merge, update ) where
 
-import Data.Map ( Map )
-import Data.Map as Map hiding ( filter, update )
-import Data.Set as Set hiding ( filter, update )
 import Data.Function ( on )
 
-import Util.Map ( mapCombineWith )
+import Util.Map as MapUtil ( combineWithM, unionWithM )
 
 import Lucretia.Language.Definitions
 import Lucretia.Language.Types
+import Lucretia.TypeChecker.Monad
 
 
--- ** Type information update (Definition 3.4 in wp)
+-- ** Type update rules (Fig 4. "The update operation." in wp)
+
 class Update a where
-  update :: a -> a -> a
+  update :: a -> a -> CM a
 instance Update Constraints where
-  update = Map.unionWith update
+  update = MapUtil.unionWithM update
 instance Update TOr where
-  update = mapCombineWith update
+  update = MapUtil.combineWithM update
 instance Update (Maybe TSingle) where
-  update (Just (TRec r)) (Just (TRec r')) = Just $ TRec (update r r')
-  -- TODO update (Just (TRec r)) Nothing = Just $ TRec r
-  update _ t' = t'
+  update (Just (TRec r)) (Just (TRec r')) = return . Just . TRec =<< update r r'
+  update _ t' = return t'
 instance Update TRec where
-  update = Map.unionWith update
+  update = MapUtil.unionWithM update
 instance Update TAttr where
-  update _                t'@(Required, _)  = t'
-  update (definedness, i)    (Optional, i') = (definedness, merge i i')
+  update _                t'@(Required, _)  = return t'
+  update (definedness, i)    (Optional, i') = return (definedness, merge i i')
     where merge i i' = if i == i' then i else undefinedId
-          -- HERE TODO should throw an error: cannot merge when overriding a type pointer with an different optional type pointer
+          -- HERE TODO should throw an error: cannot merge when overriding a type pointer with a different optional type pointer
   -- IType must match in both sides
 
--- | The only difference between update & extend is that:
--- update overrides a type in TOr, while
--- extend adds      a type in TOr
-class Extend a where
-  extend :: a -> a -> a
-instance Extend Constraints where
-  extend = Map.unionWith extend
-instance Extend TOr where
-  extend = Map.unionWith extend
-instance Extend TSingle where
-  extend (TRec r) (TRec r') = TRec $ update r r'
-  extend _ t = t
 
--- | The only difference between extend & merge is that:
--- extend adds       attributes in TRec, while
--- merge  intersects attributes in TRec
-class Merge a where
-  merge :: a -> a -> a
-instance Merge PrePost where
-  merge pp pp' =
-    PrePost ((merge `on` _pre ) pp pp')
-            ((merge `on` _post) pp pp')
-instance Merge Constraints where
-  merge = Map.unionWith merge
-instance Merge TOr where
-  merge = Map.unionWith merge
-instance Merge TSingle where
-  merge (TRec r) (TRec r') = TRec $ merge r r'
-  merge _ t = t -- in case of a function type: just select the second function type. The error will be already thrown when trying to merge two IType's in renaming
-instance Merge TRec where
-  merge = mapCombineWith merge
-instance Merge (Maybe TAttr) where
+-- ** Type merging rules for the if-like instructions
+-- (derived from weakening: Fig. 5. "Order over constraints." in wp)
+
+-- | Merge Constraints from the 'then' and 'else' branches of the 'if' instruction.
+merge :: PrePost -> PrePost -> CM PrePost
+merge pp pp' = do
+  preMerged  <- (mergePre  `on` _pre ) pp pp'
+  postMerged <- (mergePost `on` _post) pp pp'
+  return $ PrePost preMerged postMerged
+
+-- | The only difference between update & mergePre is that:
+-- update overrides a type in TOr, while
+-- mergePre adds    a type in TOr
+class MergePre a where
+  mergePre :: a -> a -> CM a
+instance MergePre Constraints where
+  mergePre = MapUtil.unionWithM mergePre
+instance MergePre TOr where
+  mergePre = MapUtil.unionWithM mergePre
+instance MergePre TSingle where
+  mergePre (TRec r) (TRec r') = return . TRec =<< update r r'
+  mergePre _ t = return t
+
+-- | The only difference between mergePre & mergePost is that:
+-- mergePre adds       attributes in TRec, while
+-- mergePost  intersects attributes in TRec
+class MergePost a where
+  mergePost :: a -> a -> CM a
+instance MergePost Constraints where
+  mergePost = MapUtil.unionWithM mergePost
+instance MergePost TOr where
+  mergePost = MapUtil.unionWithM mergePost
+instance MergePost TSingle where
+  mergePost (TRec r) (TRec r') = return . TRec =<< mergePost r r'
+  mergePost _ t = return t -- in case of a function type: just select the second function type. The error will be already thrown when trying to mergePost two IType's in renaming
+instance MergePost TRec where
+  mergePost = MapUtil.combineWithM mergePost
+instance MergePost (Maybe TAttr) where
   -- IType pointers should be the same here.
   -- Renaming should throw an error when corresponding ITypes
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
   -- But the error is found earlier, by checking that the renaming for variables
   -- not in the set of fresh variables created in the if branches.
-  merge (Just (Required, i)) (Just (Required, i')) | i==i' = Just (Required, i)
-  merge (Just (_       , i)) (Just (_       , i')) | i==i' = Just (Optional, i)
-  merge  Nothing             (Just (_       , i))          = Just (Optional, i)
-  merge (Just (_       , i))  Nothing                      = Just (Optional, i)
+  mergePost (Just (Required, i)) (Just (Required, i')) | i==i' = return $ Just (Required, i)
+  mergePost (Just (_       , i)) (Just (_       , i')) | i==i' = return $ Just (Optional, i)
+  mergePost  Nothing             (Just (_       , i))          = return $ Just (Optional, i)
+  mergePost (Just (_       , i))  Nothing                      = return $ Just (Optional, i)
 

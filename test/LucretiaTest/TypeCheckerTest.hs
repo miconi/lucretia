@@ -44,6 +44,7 @@ outputTypeTestsData =
   , ($(nv 'bSetVar_x_to_x), "X with Constraints: [Env < {x: X}, X < int]")
   , ($(nv 'bSetVar_xy__Get_y), "Y with Constraints: [Env < {x: X, y: Y}, X < int, Y < string]")
   , ($(nv 'bGetUndefinedVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: X}]")
+  , ($(nv 'bGetUndefinedVar2), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {y: Y}]")
   , ($(nv 'bNew), "X with Constraints: [Env < {}, X < {}]")
   , ($(nv 'bGetUndefinedAttr), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {a: Y}]")
   , ($(nv 'bGetAttr_noVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: Y}, Y < {a: X}]")
@@ -113,6 +114,10 @@ bSetVar_xy__Get_y =
   ]
 bGetUndefinedVar = 
   [ Return $ EGetVar "x"
+  ]
+bGetUndefinedVar2 = 
+  [ SetVar "x" cInt
+  , Return $ EGetVar "y"
   ]
 bNew =
   [ Return ENew
@@ -438,6 +443,7 @@ bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction =
     [ SetVar "cond" (EBool True)
     , SetVar "y" ENew
     , If "cond" [ ] [ SetVar "x" $ EGetVar "y" ]
+    , Return $ EGetVar "x"
     ]
   , SetVar "xx" ENew
   , Return $ EFunCall "f" ["xx"]

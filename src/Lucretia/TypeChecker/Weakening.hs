@@ -17,7 +17,7 @@ import Data.Function ( on )
 import Prelude hiding ( sequence )
 import Data.Traversable ( sequence )
 
-import Util.Map ( mapCombineWith, mapFromMaybe, nonEmpty )
+import Util.Map as MapUtil ( combineWith, fromMaybe, nonEmpty )
 import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
@@ -51,12 +51,12 @@ class Weaker a where
   --   EFunCall
   w :: a    -- ^ Post-Constraints at the place of call        (actual   conditions)
     -> a    -- ^  Pre-Constraints at the place of declaration (expected conditions)
-    -> CM a -- ^ What should be added to preconstraints to ensure call' <c call' + decl, where call' = m + whatShouldBeAdded
+    -> CM a -- ^ What should be added to preconstraints to ensure call' <c call' + decl, where call' = whatShouldBeAdded + m
 
 instance Weaker Constraints where
   w c c' = do
     intersected <- sequence $ Map.intersectionWith w c c'
-    let intersectedNonEmpty = Map.filter nonEmpty intersected
+    let intersectedNonEmpty = Map.filter MapUtil.nonEmpty intersected
     let onlyInDecl = c' `Map.difference` c
     return $ intersectedNonEmpty `Map.union` onlyInDecl
 
@@ -65,14 +65,14 @@ instance Weaker TOr where
     (Set.isSubsetOf `on` Map.keysSet) m m' `orFail`
       ("Type: "++showTOr m++" should be weaker (have less possible types) then: "++showTOr m')
     rec <- (w `on` Map.lookup KRec) m m'
-    return $ mapFromMaybe KRec rec
+    return $ MapUtil.fromMaybe KRec rec
 
 instance Weaker (Maybe TSingle) where
   w (Just (TRec s)) (Just (TRec s')) =
     return $ if Map.null attributesToAdd
                then Nothing
                else Just (TRec attributesToAdd)
-    where attributesToAdd = mapCombineWith wTAttr s s'
+    where attributesToAdd = MapUtil.combineWith wTAttr s s'
   w Nothing _ = return Nothing -- HERE Q: why Nothing as the left parameter?
   -- cannot be otherwise since:
   -- * types in "m :: TOr" are subset of types in "m' :: TOr": Set.isSubsetOf `on` Map.keys $ m m'
@@ -85,7 +85,8 @@ wTAttr :: Maybe TAttr -> Maybe TAttr -> Maybe TAttr
 wTAttr Nothing t = t
 -- IType pointers should be the same here.
 -- Renaming should throw an error when corresponding ITypes
--- from 'then' & 'else' branches cannot be renamed to the same variable.
+-- from Pre-Constraints at the place of declaration cannot be renamed
+-- to Post-Constraints at the place of call.
 wTAttr (Just (Optional, i)) (Just (Required, i')) | i==i' = Just (Required, i)
 wTAttr _ _ = Nothing
 

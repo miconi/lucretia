@@ -25,7 +25,7 @@ import Lucretia.Language.Types
 import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
 import Lucretia.TypeChecker.Monad ( freshIType, CM )
 import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming )
-import Lucretia.TypeChecker.Update ( merge, update, extend )
+import Lucretia.TypeChecker.Update ( merge, update )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
 
@@ -51,11 +51,12 @@ bind ppCall (iDecl, ppDecl) = do
   let ppRenamed  = applyRenaming renaming ppDecl
 
   toWeaken      <- _post ppCall `weaker` _pre ppRenamed
-  let preMerged  = _pre  ppCall `extend` toWeaken -- TODO toWeaken `update` ppCall
-  -- Q why not:    _post ppCall `extend` toWeaken
+  -- Using Monotonicity (Principle 1 in paper) here:
+  preMerged     <- toWeaken `update` _pre ppCall
+  -- Q why not:    toWeaken `update` _post ppCall
   -- A toWeaken is already inside _post ppRenamed
   -- because: toWeaken `isSubsetOf` _pre ppRenamed && _pre ppRenamed `isSubsetOf` _post ppRenamed
-  let postMerged = _post ppCall `update` _post ppRenamed
+  postMerged    <- _post ppCall `update` _post ppRenamed
   
   return ( applyRenaming renaming iDecl
          , PrePost preMerged postMerged
@@ -113,16 +114,16 @@ matchDefFresh (If x b1 b2) cs = do
         mergeTypes :: Constraints -> Type -> Type -> CM Type
         mergeTypes cs (_, pp1) (_, pp2) = do
           renaming <- pp1 `getRenamingPP` pp2
-          renamingOnlyOnVariablesCreatedInScope cs renaming `orFail` "Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else')."
+          renamingOnlyOnVariablesCreatedInScope cs renaming
           let pp2Renamed = applyRenaming renaming pp2
-          let mergedPP = PrePost ((extend `on` _pre ) pp1 pp2Renamed) --TODO preconditions in TOr should be intersected
-                                 ((merge  `on` _post) pp1 pp2Renamed)
+          mergedPP <- merge pp1 pp2Renamed
           return (undefinedId, mergedPP)
 
             where
-            renamingOnlyOnVariablesCreatedInScope :: Constraints -> Renaming -> Bool
+            renamingOnlyOnVariablesCreatedInScope :: Constraints -> Renaming -> CM ()
             renamingOnlyOnVariablesCreatedInScope cs r =
-              freeVariables cs `Set.intersection` freeVariables r == Set.empty
+              (freeVariables cs `Set.intersection` freeVariables r == Set.empty)
+              `orFail` "Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else')."
 
 -- | 'match' rules to an @Exp@ producing Type, then rename all @ITypes@ to fresh variables in that type.
 matchExpFresh :: Exp  -> Constraints -> CM Type
