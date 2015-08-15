@@ -10,6 +10,7 @@
 module Lucretia.TypeChecker.Update ( merge, update ) where
 
 import Data.Function ( on )
+import Control.Monad.Error ( throwError )
 
 import Util.Map as MapUtil ( combineWithM, unionWithM )
 
@@ -32,11 +33,12 @@ instance Update (Maybe TSingle) where
 instance Update TRec where
   update = MapUtil.unionWithM update
 instance Update TAttr where
-  update _                t'@(Required, _)  = return t'
-  update (definedness, i)    (Optional, i') = return (definedness, merge i i')
-    where merge i i' = if i == i' then i else undefinedId
-          -- HERE TODO should throw an error: cannot merge when overriding a type pointer with a different optional type pointer
-  -- IType must match in both sides
+  update _                t@(Required, _)  = return t
+  --update _                Forbidden = return Forbidden
+  -- IType pointers should be the same here.
+  -- Renaming should throw an error when corresponding ITypes
+  -- cannot be renamed to the same variable.
+  update (definedness, i)   (Optional, i') | i==i' = return (definedness, i)
 
 
 -- ** Type merging rules for the if-like instructions
@@ -59,12 +61,21 @@ instance MergePre Constraints where
 instance MergePre TOr where
   mergePre = MapUtil.unionWithM mergePre
 instance MergePre TSingle where
-  mergePre (TRec r) (TRec r') = return . TRec =<< update r r'
+  mergePre (TRec r) (TRec r') = return . TRec =<< mergePre r r'
   mergePre _ t = return t
+instance MergePre TRec where
+  mergePre = MapUtil.unionWithM mergePre
+instance MergePre TAttr where
+  -- IType pointers should be the same here.
+  -- Renaming should throw an error when corresponding ITypes
+  -- from 'then' & 'else' branches cannot be renamed to the same variable.
+  mergePre  t                t'            | t == t' = return t
+  mergePre (Required, i)    (Optional, i') | i == i' = return (Required, i)
+  mergePre (Optional, i)    (Required, i') | i == i' = return (Required, i)
 
 -- | The only difference between mergePre & mergePost is that:
--- mergePre adds       attributes in TRec, while
--- mergePost  intersects attributes in TRec
+-- mergePre  picks the strongest Definedness for each TAttr in TRec, while
+-- mergePost picks the weakest   Definedness for each TAttr in TRec
 class MergePost a where
   mergePost :: a -> a -> CM a
 instance MergePost Constraints where
@@ -80,10 +91,8 @@ instance MergePost (Maybe TAttr) where
   -- IType pointers should be the same here.
   -- Renaming should throw an error when corresponding ITypes
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
-  -- But the error is found earlier, by checking that the renaming for variables
-  -- not in the set of fresh variables created in the if branches.
-  mergePost (Just (Required, i)) (Just (Required, i')) | i==i' = return $ Just (Required, i)
-  mergePost (Just (_       , i)) (Just (_       , i')) | i==i' = return $ Just (Optional, i)
-  mergePost  Nothing             (Just (_       , i))          = return $ Just (Optional, i)
-  mergePost (Just (_       , i))  Nothing                      = return $ Just (Optional, i)
+  mergePost  t                    t'                   | t == t' = return t
+  mergePost (Just (_       , i)) (Just (_       , i')) | i == i' = return $ Just (Optional, i)
+  mergePost  Nothing             (Just (_       , i ))           = return $ Just (Optional, i)
+  mergePost (Just (_       , i))  Nothing                        = return $ Just (Optional, i)
 

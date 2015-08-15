@@ -8,7 +8,7 @@
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
 --module Lucretia.TypeChecker.Renaming where
-module Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming ) where
+module Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming, RenamingType(..) ) where
 
 import Prelude hiding ( any, sequence )
 
@@ -110,47 +110,54 @@ instance ApplyRenaming TFunSingle where
       (f postT)
       (ar f ppF)
  
-getRenamingOnEnv :: Constraints -> Constraints -> CM Renaming
-getRenamingOnEnv = getRenamingOnEnvWith emptyRenaming
+data RenamingType = FullRenaming | BindRenaming (Set IType)
 
-getRenamingOnEnvWith :: Renaming -> Constraints -> Constraints -> CM Renaming
-getRenamingOnEnvWith renaming = getRenamingWith renaming `on` \cs -> (getEnv cs, cs)
+getRenamingOnEnv :: RenamingType -> Constraints -> Constraints -> CM Renaming
+getRenamingOnEnv rt = getRenamingOnEnvWith rt emptyRenaming
 
-getRenamingPP :: PrePost -> PrePost -> CM Renaming
-getRenamingPP (PrePost pre post) (PrePost pre' post') = do
-  renaming <- getRenamingOnEnv pre pre'
-  getRenamingOnEnvWith renaming post post'
+getRenamingOnEnvWith :: RenamingType -> Renaming -> Constraints -> Constraints -> CM Renaming
+getRenamingOnEnvWith rt renaming = getRenamingWith rt renaming `on` \cs -> (getEnv cs, cs)
+
+getRenamingPP :: RenamingType -> PrePost -> PrePost -> CM Renaming
+getRenamingPP rt (PrePost pre post) (PrePost pre' post') = do
+  renaming <- getRenamingOnEnv rt pre pre'
+  getRenamingOnEnvWith rt renaming post post'
 
 class GetRenaming a where
   -- | Gets renaming.
   -- Resulting Renaming does not contain identity pairs.
   -- Expected condition should be w or equal to actual condition.
-  getRenaming :: (a, Constraints) -- ^ @a@ at the place of call
+  getRenaming :: RenamingType
+              -> (a, Constraints) -- ^ @a@ at the place of call
               -> (a, Constraints) -- ^ @a@ at the place of declaration
               -> CM Renaming       -- ^ Possible renamings
-  getRenaming = getRenamingWith emptyRenaming
+  getRenaming rt = getRenamingWith rt emptyRenaming
 
-  getRenamingWith :: Renaming
+  getRenamingWith :: RenamingType
+                  -> Renaming
                   -> (a, Constraints)
                   -> (a, Constraints)
                   -> CM Renaming
-  getRenamingWith renaming (a, cs) (a', cs') = fmap removeIdentities $ lift $ execStateT (runReaderT (r a a') (cs, cs')) renaming
+  getRenamingWith rt renaming (a, cs) (a', cs') = fmap removeIdentities $ lift $ execStateT (runReaderT (r a a') (Parameters rt (cs, cs'))) renaming
     where
-    -- The Renaming property that it has no identity pairs is used in the implementation of the if rule.
+    -- The Renaming property of having no identity pairs is used in the implementation of the if rule.
     removeIdentities :: Renaming -> Renaming
     removeIdentities = Set.filter (\(x, y) -> not $ x == y)
 
   r :: a -- ^ Get renaming to this …
     -> a -- ^ … from that.
     -> M ()
-type M = ReaderT Environment (StateT Renaming (ErrorT ErrorMsg Identity))
+type M = ReaderT Parameters (StateT Renaming (ErrorT ErrorMsg Identity))
 type Environment = (Constraints, Constraints)
+data Parameters = Parameters { renamingType :: RenamingType
+                             , environment :: Environment
+                             }
 
 ok = return ()
 getVisited :: M Renaming
 getVisited = get
 asksConstraints :: (Environment -> Constraints) -> M Constraints
-asksConstraints = asks
+asksConstraints f = asks (f . environment)
 
 instance GetRenaming [IType] where
   r (i:is) (i':is') = r i i' >> r is is'
@@ -178,7 +185,7 @@ instance GetRenaming IType where
 
       neitherMemberOf :: (IType, IType) -> Renaming -> M ()
       (i, i') `neitherMemberOf` visited = do
-        cs <- ask
+        cs <- asks environment
         let errorDetails = ". Error occured while tried to get renaming from: "++showConstraints (snd cs)++ " to: "++showConstraints (fst cs)
         not (memberFst i  visited) `orFail` ("There are multiple variables that should be renamed to "++i++errorDetails)
         not (memberSnd i' visited) `orFail` ("There are multiple variables that should be renamed from "++i'++errorDetails)
@@ -200,16 +207,28 @@ instance GetRenaming (Maybe TSingle) where
   -- get renaming only where possible
   -- i.e. where there is are 'KRec' defined in both 'TOr' values
 instance GetRenaming TRec where
-  -- TODO RTR: r t t' = sequence $ intersectionWith r t t'
   r t t' = (r `on` inBoth) t t'
     where
-      inBoth = fmap snd . findAll (Set.toList keysInBoth)
+      inBoth = findAll (Set.toList keysInBoth)
       keysInBoth :: Set IAttr
       keysInBoth = Map.keysSet t `Set.intersection` Map.keysSet t'
 instance GetRenaming [TAttr] where
   r (i:is) (i':is') = r i i' >> r is is'
   r []     []       = ok
 instance GetRenaming TAttr where
-  r (_, t) (_, t') = r t t'
+  r a a' = do
+    rt <- asks renamingType
+    case rt of
+      FullRenaming                -> rFull a a'
+      BindRenaming freshVariables -> rBind a a' freshVariables
+
+    where
+      rFull (_       , i) (_       , i') = r i i'
+      rBind (Optional, i) (Required, i') freshVariables =
+        if i `Set.member` freshVariables
+          then throwError $ "Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined)."
+          else r i i'
+      rBind (_       , i) (_       , i') freshVariables = r i i'
+
 
 

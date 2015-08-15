@@ -24,7 +24,7 @@ import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
 import Lucretia.TypeChecker.Monad ( freshIType, CM )
-import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming )
+import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming, RenamingType(..) )
 import Lucretia.TypeChecker.Update ( merge, update )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
@@ -47,7 +47,7 @@ matchBlockT (x:xs) (_, pp) = do
 
 bind :: PrePost -> Type -> CM Type
 bind ppCall (iDecl, ppDecl) = do
-  renaming      <- _post ppCall `getRenamingOnEnv` _pre ppDecl
+  renaming      <- getRenamingOnEnv (BindRenaming $ freshVariables ppCall) (_post ppCall) (_pre ppDecl)
   let ppRenamed  = applyRenaming renaming ppDecl
 
   toWeaken      <- _post ppCall `weaker` _pre ppRenamed
@@ -61,6 +61,9 @@ bind ppCall (iDecl, ppDecl) = do
   return ( applyRenaming renaming iDecl
          , PrePost preMerged postMerged
          )
+
+freshVariables :: PrePost -> Set IType
+freshVariables pp = (Set.difference `on` freeVariables) (_post pp) (_pre pp)
 
 -- All @IType@ variables in the returned @Type@ must be fresh, so there is no risk of @IType@ name clashes when @'bind'ing@ @Type@ of the current @Def@ to the @PrePost@ of the block preceding the @Def@.
 matchDefFresh :: Def -> Constraints -> CM Type
@@ -113,7 +116,7 @@ matchDefFresh (If x b1 b2) cs = do
 
         mergeTypes :: Constraints -> Type -> Type -> CM Type
         mergeTypes cs (_, pp1) (_, pp2) = do
-          renaming <- pp1 `getRenamingPP` pp2
+          renaming <- getRenamingPP FullRenaming pp1 pp2
           renamingOnlyOnVariablesCreatedInScope cs renaming
           let pp2Renamed = applyRenaming renaming pp2
           mergedPP <- merge pp1 pp2Renamed
@@ -238,7 +241,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
     checkPost :: [IType] -> IType -> Constraints -> IType -> Constraints -> CM ()
     checkPost argNames iInfered csInfered iDecl csDecl = do
-      renaming <- (iDecl:argNames, csDecl) `getRenaming` (iInfered:argNames, csInfered)
+      renaming <- getRenaming FullRenaming (iDecl:argNames, csDecl) (iInfered:argNames, csInfered)
       (iDecl == applyRenaming renaming iInfered) `orFail`
         ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
       applyRenaming renaming csInfered `checkWeaker` csDecl

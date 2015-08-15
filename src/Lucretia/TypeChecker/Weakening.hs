@@ -14,10 +14,11 @@ import Data.Set ( Set )
 import Data.Set as Set hiding ( filter, update )
 import Data.Function ( on )
 
-import Prelude hiding ( sequence )
+import Control.Monad.Error ( throwError )
 import Data.Traversable ( sequence )
+import Prelude hiding ( sequence )
 
-import Util.Map as MapUtil ( combineWith, fromMaybe, nonEmpty )
+import Util.Map as MapUtil ( combineWithM, fromMaybe, nonEmpty )
 import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
@@ -68,25 +69,22 @@ instance Weaker TOr where
     return $ MapUtil.fromMaybe KRec rec
 
 instance Weaker (Maybe TSingle) where
-  w (Just (TRec s)) (Just (TRec s')) =
+  w (Just (TRec s)) (Just (TRec s')) = do
+    attributesToAdd <- MapUtil.combineWithM wTAttr s s'
     return $ if Map.null attributesToAdd
-               then Nothing
-               else Just (TRec attributesToAdd)
-    where attributesToAdd = MapUtil.combineWith wTAttr s s'
+                then Nothing
+                else Just $ TRec attributesToAdd
   w Nothing _ = return Nothing -- HERE Q: why Nothing as the left parameter?
   -- cannot be otherwise since:
   -- * types in "m :: TOr" are subset of types in "m' :: TOr": Set.isSubsetOf `on` Map.keys $ m m'
   -- * "w" on "Maybe TSingle" parameters are TRecs: rec <- (w `on` Map.lookup KRec) m m'
 
-wTAttr :: Maybe TAttr -> Maybe TAttr -> Maybe TAttr
+wTAttr :: Maybe TAttr -> Maybe TAttr -> CM (Maybe TAttr)
 -- Nothing as a result means that the 'weaker' relation holds
 -- (without a need to add any conditions).
 -- wTAttr Nothing Nothing = Nothing -- commented out because Nothing from both maps is not possible
-wTAttr Nothing t = t
--- IType pointers should be the same here.
--- Renaming should throw an error when corresponding ITypes
--- from Pre-Constraints at the place of declaration cannot be renamed
--- to Post-Constraints at the place of call.
-wTAttr (Just (Optional, i)) (Just (Required, i')) | i==i' = Just (Required, i)
-wTAttr _ _ = Nothing
+wTAttr Nothing t = return t
+wTAttr (Just (Optional, i)) (Just (Required, i')) | i==i' = return $ Just (Required, i)
+wTAttr (Just (Optional, _)) (Just (Required, _)) = throwError "Inside the programme a variable was referenced which may be undefined."
+wTAttr _ _ = return Nothing
 
