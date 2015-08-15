@@ -5,7 +5,7 @@
 --
 -- Map utility functions.
 -----------------------------------------------------------------------------
-module Util.Map ( combineWith, combineWithM, findAll, fromMaybe, lookupAll, nonEmpty, unionWithM ) where
+module Util.Map ( combineWith, combineWithM, findAll, fromMaybe, intersectionWithM, lookupAll, nonEmpty, unionWithM ) where
 
 import Prelude hiding ( sequence )
 import Data.Traversable ( sequence )
@@ -75,6 +75,11 @@ findAll   keys m = fmap (m Map.!) keys
 -- of this function.
 fromMaybe :: Ord k => k -> Maybe v -> Map k v
 fromMaybe k v = Map.alter (\_ -> v) k Map.empty
+
+-- | Monadic version of Map.intersectionWith.
+intersectionWithM :: (Monad m, Ord k) => (v -> v -> m v) -> Map k v -> Map k v -> m (Map k v)
+intersectionWithM f mapA mapB =
+  sequence $ intersectionWith (\mx my -> do {x <- mx; y <- my; f x y}) (fmap return mapA) (fmap return mapB)
 
 -- | Lookup values for given keys.
 --

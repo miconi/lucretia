@@ -12,7 +12,7 @@ module Lucretia.TypeChecker.Update ( merge, update ) where
 import Data.Function ( on )
 import Control.Monad.Error ( throwError )
 
-import Util.Map as MapUtil ( combineWithM, unionWithM )
+import Util.Map as MapUtil ( combineWithM, intersectionWithM, nonEmpty, unionWithM )
 
 import Lucretia.Language.Definitions
 import Lucretia.Language.Types
@@ -59,7 +59,11 @@ class MergePre a where
 instance MergePre Constraints where
   mergePre = MapUtil.unionWithM mergePre
 instance MergePre TOr where
-  mergePre = MapUtil.unionWithM mergePre
+  mergePre t t' = do
+    inBoth <- MapUtil.intersectionWithM mergePre t t'
+    if MapUtil.nonEmpty inBoth
+      then return inBoth
+      else throwError $ "When merging preconditions in if branches: a conflicting type cannot be both "++show t++" and "++show t'++"."
 instance MergePre TSingle where
   mergePre (TRec r) (TRec r') = return . TRec =<< mergePre r r'
   mergePre _ t = return t
