@@ -55,7 +55,8 @@ instance FreeVariables TSingle where
   freeVariables (TRec rec) = (freeVariables . Map.elems) rec
   freeVariables _ = Set.empty
 instance FreeVariables TAttr where
-  freeVariables (_, i) = Set.singleton i
+  freeVariables Forbidden = Set.empty
+  freeVariables (WithPtr _ i) = Set.singleton i
 
 -- | Renaming to actual 'IType' (at call) from expected 'IType' (at declaration).
 --
@@ -102,7 +103,8 @@ instance ApplyRenaming TSingle where
   --ar f (TFun fun) = TFun $ ar f fun
   ar _ t = t
 instance ApplyRenaming TAttr where
-  ar f (definedness, i) = (definedness, f i)
+  ar f Forbidden               = Forbidden
+  ar f (WithPtr definedness i) = WithPtr definedness (f i)
 instance ApplyRenaming TFunSingle where
   ar f (TFunSingle preTs postT ppF) =
     TFunSingle 
@@ -216,6 +218,8 @@ instance GetRenaming [TAttr] where
   r (i:is) (i':is') = r i i' >> r is is'
   r []     []       = ok
 instance GetRenaming TAttr where
+  r Forbidden _ = ok
+  r _ Forbidden = ok
   r a a' = do
     rt <- asks renamingType
     case rt of
@@ -223,12 +227,13 @@ instance GetRenaming TAttr where
       BindRenaming freshVariables -> rBind a a' freshVariables
 
     where
-      rFull (_       , i) (_       , i') = r i i'
-      rBind (Optional, i) (Required, i') freshVariables =
+      rFull (WithPtr _        i) (WithPtr _        i') = r i i'
+
+      rBind (WithPtr Optional i) (WithPtr Required i') freshVariables =
         if i `Set.member` freshVariables
           then throwError $ "Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined)."
           else r i i'
-      rBind (_       , i) (_       , i') freshVariables = r i i'
+      rBind (WithPtr _        i) (WithPtr _        i') _ = r i i'
 
 
 

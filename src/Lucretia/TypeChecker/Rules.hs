@@ -183,9 +183,10 @@ matchExp (EFunCall f xsCall) cs = do
     getFunType :: IVar -> Constraints -> CM TFunSingle
     getFunType f cs =
       case f `lookupInEnv` cs of
-        Nothing               -> error pleaseDefineSignature
-        Just (Optional, _)    -> error $ "Function "++f++" may be undefined."
-        Just (Required, ifun) -> case ifun `lookupInConstraints` cs of
+        Nothing                      -> error pleaseDefineSignature
+        Just Forbidden               -> error pleaseDefineSignature
+        Just (WithPtr Optional _   ) -> error $ "Function "++f++" may be undefined."
+        Just (WithPtr Required ifun) -> case ifun `lookupInConstraints` cs of
            Just tfun -> unwrapFunFromOr tfun
            Nothing   -> error pleaseDefineSignature 
         where pleaseDefineSignature = "Please declare signature for the function "++f++". Infering type of a function passed as a parameter to another function (higher order function type inference) is not supported yet."
@@ -291,7 +292,7 @@ postPointer :: TOr -> CM Type
 postPointer tOr = return (xId, PrePost emptyConstraints (Map.insert xId tOr emptyConstraints))
 
 required :: IType -> TAttr
-required i = (Required, i)
+required i = (WithPtr Required i)
 
 requiredList :: [IType] -> [TAttr]
 requiredList = fmap required

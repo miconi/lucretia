@@ -33,12 +33,15 @@ instance Update (Maybe TSingle) where
 instance Update TRec where
   update = MapUtil.unionWithM update
 instance Update TAttr where
-  update _                t@(Required, _)  = return t
-  --update _                Forbidden = return Forbidden
+  update  _               Forbidden                    = return Forbidden
+  update  _            t@(WithPtr Required _ )         = return t
+  update  Forbidden    t@(WithPtr Optional _ )         = return t
+  update (WithPtr d i)   (WithPtr Optional i') | i==i' = return $ WithPtr d i
+  -- TODO what if i /= i'?
+    -- write test: x = new; y = x; if c then [] else [x = y]; return x
   -- IType pointers should be the same here.
   -- Renaming should throw an error when corresponding ITypes
   -- cannot be renamed to the same variable.
-  update (definedness, i)   (Optional, i') | i==i' = return (definedness, i)
 
 
 -- ** Type merging rules for the if-like instructions
@@ -63,7 +66,7 @@ instance MergePre TOr where
     inBoth <- MapUtil.intersectionWithM mergePre t t'
     if MapUtil.nonEmpty inBoth
       then return inBoth
-      else throwError $ "When merging preconditions in if branches: a conflicting type cannot be both "++show t++" and "++show t'++"."
+      else throwError $ "When merging preconditions from if branches: a conflicting type cannot be both "++show t++" and "++show t'++"."
 instance MergePre TSingle where
   mergePre (TRec r) (TRec r') = return . TRec =<< mergePre r r'
   mergePre _ t = return t
@@ -73,9 +76,13 @@ instance MergePre TAttr where
   -- IType pointers should be the same here.
   -- Renaming should throw an error when corresponding ITypes
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
-  mergePre  t                t'            | t == t' = return t
-  mergePre (Required, i)    (Optional, i') | i == i' = return (Required, i)
-  mergePre (Optional, i)    (Required, i') | i == i' = return (Required, i)
+  mergePre t                      t'           | t == t' = return t
+  mergePre t@(WithPtr Required _)    Forbidden           = cannotMerge
+  mergePre    Forbidden           t@(WithPtr Required _) = cannotMerge
+  mergePre   (WithPtr Optional _) t                      = return t
+  mergePre t                        (WithPtr Optional _) = return t
+
+cannotMerge = throwError $ "When merging preconditions from if branches: an attribute cannot be both required and forbidden."
 
 -- | The only difference between mergePre & mergePost is that:
 -- mergePre  picks the strongest Definedness for each TAttr in TRec, while
@@ -95,8 +102,9 @@ instance MergePost (Maybe TAttr) where
   -- IType pointers should be the same here.
   -- Renaming should throw an error when corresponding ITypes
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
-  mergePost  t                    t'                   | t == t' = return t
-  mergePost (Just (_       , i)) (Just (_       , i')) | i == i' = return $ Just (Optional, i)
-  mergePost  Nothing             (Just (_       , i ))           = return $ Just (Optional, i)
-  mergePost (Just (_       , i))  Nothing                        = return $ Just (Optional, i)
+  mergePost  t                    t'        | t == t' = return t
+  mergePost (Just Forbidden)      Nothing             = return Nothing
+  mergePost  Nothing             (Just Forbidden)     = return Nothing
+  mergePost  _                   (Just (WithPtr _ i)) = return . Just $ WithPtr Optional i
+  mergePost (Just (WithPtr _ i))  _                   = return . Just $ WithPtr Optional i
 

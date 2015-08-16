@@ -81,8 +81,9 @@ showRec :: TRec -> String
 showRec r = concat ["{", showFields r, "}"]
   where
   showFields r = intercalate ", " $ map showField $ Map.toList r
-  showField (a, (Required, i)) = concat [a, ": ", i]
-  showField (a, (Optional, i)) = concat ["optional ", a, ": ", i]
+  showField (a,  Forbidden          ) = concat ["forbidden ", a]
+  showField (a, (WithPtr Required i)) = concat [a, ": ", i]
+  showField (a, (WithPtr Optional i)) = concat ["optional ", a, ": ", i]
 
 
 -- * Language.Types (/Defition 2.1 (Language.Types)/ in wp)
@@ -122,9 +123,10 @@ data TSingle     = TRec TRec
 -- It is the same type as 'Env'
 type TRec = Map IAttr TAttr
 
-type TAttr = (Definedness, IType)
+data TAttr = Forbidden | WithPtr Definedness IType
+  deriving (Eq, Ord, Show)
 
-data Definedness = Required | Optional -- ^ that case is unneeded: | NotDefined
+data Definedness = Required | Optional
   deriving (Eq, Ord, Show)
 
 type TFun = Maybe TFunSingle
@@ -213,7 +215,7 @@ toSingletonRec :: IType -> IAttr -> IType -> (IType, TOr)
 toSingletonRec xId a aId = (xId, tOrSingletonRec a aId)
 
 tOrSingletonRec :: IAttr -> IType -> TOr
-tOrSingletonRec a t = tOrFromTRec $ Map.singleton a (Required, t)
+tOrSingletonRec a t = tOrFromTRec $ Map.singleton a (WithPtr Required t)
 
 tOrFromTSingle :: TSingle -> TOr
 tOrFromTSingle tSingle = Map.singleton (kind tSingle) tSingle

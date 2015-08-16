@@ -203,8 +203,8 @@ bFun_withSignature_identitySetFields =
         (DeclaredPP $ PrePost
           (Map.fromList [ ("R", tOrEmptyRec)
                         ])
-          (Map.fromList [ ("R", tOrFromTRec $ Map.fromList [ ("a", (Required, "X"))
-                                                           , ("b", (Required, "Y"))
+          (Map.fromList [ ("R", tOrFromTRec $ Map.fromList [ ("a", (WithPtr Required "X"))
+                                                           , ("b", (WithPtr Required "Y"))
                                                            ])
                         ])
         )
