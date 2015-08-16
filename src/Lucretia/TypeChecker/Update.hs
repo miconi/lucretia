@@ -37,8 +37,6 @@ instance Update TAttr where
   update  _            t@(WithPtr Required _ )         = return t
   update  Forbidden    t@(WithPtr Optional _ )         = return t
   update (WithPtr d i)   (WithPtr Optional i') | i==i' = return $ WithPtr d i
-  -- TODO what if i /= i'?
-    -- write test: x = new; y = x; if c then [] else [x = y]; return x
   -- IType pointers should be the same here.
   -- Renaming should throw an error when corresponding ITypes
   -- cannot be renamed to the same variable.
