@@ -3,7 +3,7 @@
 -- Copyright   :  (c) Michał Oniszczuk 2011 - 2014
 -- Maintainer  :  michal.oniszczuk@gmail.com
 --
--- Renaming on Record Identifiers ('IType' @->@ 'IType').
+-- Renaming on Record Identifiers ('Ptr' @->@ 'Ptr').
 -----------------------------------------------------------------------------
 {-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
 
@@ -37,7 +37,7 @@ import Lucretia.TypeChecker.Monad ( CM )
 
 -- | Get all free occuring variables.
 class FreeVariables a where
-  freeVariables :: a -> Set IType
+  freeVariables :: a -> Set Ptr
 instance FreeVariables Renaming where
   freeVariables r = Set.map fst r `Set.union` Set.map snd r
 instance FreeVariables FunPrePost where
@@ -58,10 +58,10 @@ instance FreeVariables TAttr where
   freeVariables Forbidden = Set.empty
   freeVariables (WithPtr _ i) = Set.singleton i
 
--- | Renaming to actual 'IType' (at call) from expected 'IType' (at declaration).
+-- | Renaming to actual 'Ptr' (at call) from expected 'Ptr' (at declaration).
 --
 -- Also serves as a list of visited node pairs.
-type Renaming = Set (IType, IType)
+type Renaming = Set (Ptr, Ptr)
 
 emptyRenaming :: Renaming
 emptyRenaming = Set.empty
@@ -72,19 +72,19 @@ applyRenaming :: ApplyRenaming t
               -> t -> t
 applyRenaming renaming = ar $ functionFromSetOfPairs $ Set.map swap renaming
   where
-  functionFromSetOfPairs :: Set (IType, IType) -> IType -> IType
+  functionFromSetOfPairs :: Set (Ptr, Ptr) -> Ptr -> Ptr
   functionFromSetOfPairs set = fromMap $ Map.fromList . Set.toList $ set
 
-  fromMap :: Map.Map IType IType -> IType -> IType 
+  fromMap :: Map.Map Ptr Ptr -> Ptr -> Ptr
   fromMap map i = Map.findWithDefault i i map
 
 class ApplyRenaming t where
-  -- | Rename the whole nested structure, starting from IType in Constraints
-  -- and ending on IType in TOr. Do not rename recursively, there is no need to do it.
-  ar :: (IType -> IType) -> t -> t
+  -- | Rename the whole nested structure, starting from Ptr in Constraints
+  -- and ending on Ptr in TOr. Do not rename recursively, there is no need to do it.
+  ar :: (Ptr -> Ptr) -> t -> t
 instance ApplyRenaming Type where
   ar f (i, pp) = (f i, ar f pp)
-instance ApplyRenaming IType where
+instance ApplyRenaming Ptr where
   ar f = f
 instance ApplyRenaming FunPrePost where
   ar f (DeclaredPP pp) = DeclaredPP $ ar f pp
@@ -112,7 +112,7 @@ instance ApplyRenaming TFunSingle where
       (f postT)
       (ar f ppF)
  
-data RenamingType = FullRenaming | BindRenaming (Set IType)
+data RenamingType = FullRenaming | BindRenaming (Set Ptr)
 
 getRenamingOnEnv :: RenamingType -> Constraints -> Constraints -> CM Renaming
 getRenamingOnEnv rt = getRenamingOnEnvWith rt emptyRenaming
@@ -161,10 +161,10 @@ getVisited = get
 asksConstraints :: (Environment -> Constraints) -> M Constraints
 asksConstraints f = asks (f . environment)
 
-instance GetRenaming [IType] where
+instance GetRenaming [Ptr] where
   r (i:is) (i':is') = r i i' >> r is is'
   r []     []       = ok
-instance GetRenaming IType where
+instance GetRenaming Ptr where
   r i i' = do
     visited <- getVisited
     if alreadyFollowed (i, i') visited
@@ -177,15 +177,15 @@ instance GetRenaming IType where
         visited <- getVisited
         ((i, i') `neitherMemberOf` visited)
         modify $ Set.insert (i, i')
-        t  <- getITypeFromConstraints i  fst
-        t' <- getITypeFromConstraints i' snd
+        t  <- getPtrFromConstraints i  fst
+        t' <- getPtrFromConstraints i' snd
         r t t'
 
-      getITypeFromConstraints i which = do
+      getPtrFromConstraints i which = do
         cs <- asksConstraints which
         return $ Map.lookup i cs
 
-      neitherMemberOf :: (IType, IType) -> Renaming -> M ()
+      neitherMemberOf :: (Ptr, Ptr) -> Renaming -> M ()
       (i, i') `neitherMemberOf` visited = do
         cs <- asks environment
         let errorDetails = ". Error occured while tried to get renaming from: "++showConstraints (snd cs)++ " to: "++showConstraints (fst cs)
@@ -200,7 +200,7 @@ instance GetRenaming (Maybe TOr) where
   r (Just t) (Just t') = r t t'
   r _ _ = ok
   -- get renaming only where possible
-  -- i.e. where there is a 'TOr' defined in 'Constraints' for a corresponding 'IType'
+  -- i.e. where there is a 'TOr' defined in 'Constraints' for a corresponding 'Ptr'
 instance GetRenaming TOr where
   r = r `on` Map.lookup KRec
 instance GetRenaming (Maybe TSingle) where

@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 {-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts #-}
 
-module Lucretia.TypeChecker.Rules ( matchBlock ) where
+module Lucretia.TypeChecker.Rules ( matchProgramme ) where
 
 import Prelude hiding ( error )
 import Control.Monad.State ( lift )
@@ -22,28 +22,30 @@ import Lucretia.Language.Definitions
 import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
-import Lucretia.TypeChecker.Monad ( error, freshIType, CM )
-import Lucretia.TypeChecker.Monad ( freshIType, CM )
+import Lucretia.TypeChecker.Monad ( error, freshPtr, CM )
+import Lucretia.TypeChecker.Monad ( freshPtr, CM )
 import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming, RenamingType(..) )
 import Lucretia.TypeChecker.Update ( merge, update )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
 
-matchBlock :: Defs -> Constraints -> CM Type
-matchBlock xs post = matchBlockT xs (undefinedId, PrePost emptyConstraints post)
+matchProgramme :: Block -> CM Type
+matchProgramme ss = bindBlockCs ss emptyConstraints
 
--- | Bind Pre- & Post-Constraints 'pp' of a code block B with Type of the next statement x, producing Type of the whole Defs including statement x.
+bindBlockCs :: Block -> Constraints -> CM Type
+bindBlockCs ss cs = bindBlock ss (undefinedId, PrePost emptyConstraints cs)
+
+-- | Bind Pre- & Post-Constraints 'pp' of a code block B with Type of the next statement x, producing Type of the whole Block including statement x.
 -- B x1
 -- B x2
 -- B ...
 -- B xN
 --   x
-matchBlockT :: Defs -> Type -> CM Type -- TODO OPT RTR IType to (Maybe IType)
-matchBlockT [] t = return t
-matchBlockT (x:xs) (_, pp) = do
-  xT     <- matchDefFresh x (_post pp)
-  boundT <- bind pp xT
-  matchBlockT xs boundT
+bindBlock :: Block -> Type -> CM Type -- TODO OPT RTR Ptr to (Maybe Ptr)
+bindBlock [] t = return t
+bindBlock (s:ss) (_, pp) = do
+  sT <- bindStmt s pp
+  bindBlock ss sT
 
 bind :: PrePost -> Type -> CM Type
 bind ppCall (iDecl, ppDecl) = do
@@ -62,15 +64,68 @@ bind ppCall (iDecl, ppDecl) = do
          , PrePost preMerged postMerged
          )
 
-freshVariables :: PrePost -> Set IType
-freshVariables pp = (Set.difference `on` freeVariables) (_post pp) (_pre pp)
+  where
+  freshVariables :: PrePost -> Set Ptr
+  freshVariables pp = (Set.difference `on` freeVariables) (_post pp) (_pre pp)
 
--- All @IType@ variables in the returned @Type@ must be fresh, so there is no risk of @IType@ name clashes when @'bind'ing@ @Type@ of the current @Def@ to the @PrePost@ of the block preceding the @Def@.
-matchDefFresh :: Def -> Constraints -> CM Type
+bindPP :: PrePost -> PrePost -> CM Type
+bindPP ppCall ppDecl = bind ppCall (undefinedId, ppDecl)
 
-matchDefFresh (Return e) cs = matchExpFresh e cs
+bindStmt :: Stmt -> PrePost -> CM Type
 
-matchDefFresh (SetVar x e) cs = do
+-- Binding statements inside an if statement is handled in a special way. Other statements are handled by matchStmt function.
+-- TODO If can be an expression
+bindStmt (If x b1 b2) pp = do
+  xId <- freshPtr
+  t@(_, PrePost _ cs) <- bindPP pp (isBool x xId)
+
+  t1 <- bindBlock b1 t
+  t2 <- bindBlock b2 t
+
+  mergeTypes cs t1 t2
+
+-- bindStmt (IfHasAttr x a b1 b2) pp = do
+--   t1 <- matchProgramme b1 cs
+--   t2 <- matchProgramme b2 cs
+--   branchesMerged <- mergeTypes cs t1 t2
+-- 
+--   xId <- freshPtr
+--   bind (isBool x xId) branchesMerged
+-- 
+--   where 
+--   thenStarter :: IVar -> IAttr -> PrePost
+--   elseStarter :: IVar -> IAttr -> PrePost
+
+-- Type produced by compiling all the other statements to PrePost can be bound in the same way.
+bindStmt s pp = do
+  sT <- matchStmt s (_post pp)
+  bind pp sT
+
+isBool :: IVar -> Ptr -> PrePost
+isBool x xId = PrePost cs cs
+  where cs = Map.fromList [ toSingletonRec env x xId
+                          , xToBool
+                          ]
+        xToBool = (xId, tOrPrimitive KBool)
+
+mergeTypes :: Constraints -> Type -> Type -> CM Type
+mergeTypes cs (_, pp1) (_, pp2) = do
+  renaming <- getRenamingPP FullRenaming pp1 pp2
+  renamingOnlyOnVariablesCreatedInScope cs renaming
+  let pp2Renamed = applyRenaming renaming pp2
+  mergedPP <- merge pp1 pp2Renamed
+  return (undefinedId, mergedPP)
+    where
+    renamingOnlyOnVariablesCreatedInScope :: Constraints -> Renaming -> CM ()
+    renamingOnlyOnVariablesCreatedInScope cs r =
+      (freeVariables cs `Set.intersection` freeVariables r == Set.empty)
+      `orFail` "Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else')."
+-- All @Ptr@ variables in the returned @Type@ must be fresh, so there is no risk of @Ptr@ name clashes when @'bind'ing@ @Type@ of the current @Stmt@ to the @PrePost@ of the block preceding the @Stmt@.
+matchStmt :: Stmt -> Constraints -> CM Type
+
+matchStmt (Return e) cs = matchExpFresh e cs
+
+matchStmt (SetVar x e) cs = do
   (eId, ePP) <- matchExpFresh e cs
   let setPP = setVar x eId
   bind ePP (eId, setPP)
@@ -84,9 +139,9 @@ matchDefFresh (SetVar x e) cs = do
           where pre  = Map.fromList [ toEmptyRec     env       ]
                 post = Map.fromList [ toSingletonRec env x eId ]
 
-matchDefFresh (SetAttr x a e) cs = do
+matchStmt (SetAttr x a e) cs = do
   (eId, ePP) <- matchExpFresh e cs
-  xId <- freshIType
+  xId <- freshPtr
   let setPP = setAttr x xId a eId
   bind ePP (eId, setPP)
 
@@ -98,37 +153,8 @@ matchDefFresh (SetAttr x a e) cs = do
                                     , toSingletonRec xId a eId
                                     ]
 
--- TODO If can be an expression
-matchDefFresh (If x b1 b2) cs = do
-  t1 <- matchBlock b1 cs
-  t2 <- matchBlock b2 cs
-  branchesMerged <- mergeTypes cs t1 t2
 
-  xId <- freshIType
-  bind (isBool x xId) branchesMerged
-
-  where isBool :: IVar -> IType -> PrePost
-        isBool x xId = PrePost cs cs
-          where cs = Map.fromList [ toSingletonRec env x xId
-                                  , xToBool
-                                  ]
-                xToBool = (xId, tOrPrimitive KBool)
-
-        mergeTypes :: Constraints -> Type -> Type -> CM Type
-        mergeTypes cs (_, pp1) (_, pp2) = do
-          renaming <- getRenamingPP FullRenaming pp1 pp2
-          renamingOnlyOnVariablesCreatedInScope cs renaming
-          let pp2Renamed = applyRenaming renaming pp2
-          mergedPP <- merge pp1 pp2Renamed
-          return (undefinedId, mergedPP)
-
-            where
-            renamingOnlyOnVariablesCreatedInScope :: Constraints -> Renaming -> CM ()
-            renamingOnlyOnVariablesCreatedInScope cs r =
-              (freeVariables cs `Set.intersection` freeVariables r == Set.empty)
-              `orFail` "Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else')."
-
--- | 'match' rules to an @Exp@ producing Type, then rename all @ITypes@ to fresh variables in that type.
+-- | 'match' rules to an @Exp@ producing Type, then rename all @Ptrs@ to fresh variables in that type.
 matchExpFresh :: Exp  -> Constraints -> CM Type
 matchExpFresh e cs = do
   t <- matchExp e cs
@@ -137,12 +163,12 @@ matchExpFresh e cs = do
     where
     renameToFresh :: Type -> CM Type
     renameToFresh t@(_, pp) = do
-      let usedITypes = Set.toList $ freeVariables pp
-      renaming <- mapM usedToFresh usedITypes
+      let usedPtrs = Set.toList $ freeVariables pp
+      renaming <- mapM usedToFresh usedPtrs
       return $ applyRenaming (Set.fromList renaming) t
 
-    usedToFresh :: IType -> CM (IType, IType)
-    usedToFresh iUsed = do iFresh <- freshIType
+    usedToFresh :: Ptr -> CM (Ptr, Ptr)
+    usedToFresh iUsed = do iFresh <- freshPtr
                            return (iFresh, iUsed)
   
 -- | Get Type (Pre- & Post-Constraints) of the next expression e. Type of a preceding block of statements B is given, so that the rule for a function call can read a called function signature.
@@ -227,7 +253,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       let ppInherited = inheritPP ppDecl
       let argCs = addArgsCs argNames argTypes (_pre ppInherited)
 
-      (iInfered, ppInfered) <- matchBlock funBody argCs
+      (iInfered, ppInfered) <- bindBlockCs funBody argCs
 
       checkEmptyPreEnv ppInfered
       let ppInferedNoEnv = eraseEnv ppInfered
@@ -240,7 +266,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
 
     checkPre = checkWeaker `on` _pre
 
-    checkPost :: [IType] -> IType -> Constraints -> IType -> Constraints -> CM ()
+    checkPost :: [Ptr] -> Ptr -> Constraints -> Ptr -> Constraints -> CM ()
     checkPost argNames iInfered csInfered iDecl csDecl = do
       renaming <- getRenaming FullRenaming (iDecl:argNames, csDecl) (iInfered:argNames, csInfered)
       (iDecl == applyRenaming renaming iInfered) `orFail`
@@ -248,9 +274,9 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       applyRenaming renaming csInfered `checkWeaker` csDecl
             
 
-    inferSignature :: [IVar] -> Defs -> CM TFunSingle
+    inferSignature :: [IVar] -> Block -> CM TFunSingle
     inferSignature argNames funBody = do
-      funType <- matchBlock funBody emptyConstraints
+      funType <- matchProgramme funBody
 
       let argTypes = fmap (\n -> "A"++n) argNames
       let argCs = addArgsCs argNames argTypes emptyConstraints
@@ -272,16 +298,16 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
     eraseEnv' :: Constraints -> Constraints
     eraseEnv' = Map.delete env
 
-addArgsPP :: [IAttr] -> [IType] -> PrePost -> PrePost
+addArgsPP :: [IAttr] -> [Ptr] -> PrePost -> PrePost
 addArgsPP argNames argTypes (PrePost pre post) =
   PrePost
     (addArgsCs argNames argTypes pre)
     (addArgsCs argNames argTypes post)
 
-addArgsCs :: [IVar] -> [IType] -> Constraints -> Constraints
+addArgsCs :: [IVar] -> [Ptr] -> Constraints -> Constraints
 addArgsCs argNames argTypes = Map.insert env (argsTOr argNames argTypes)
 
-argsTOr :: [IVar] -> [IType] -> TOr
+argsTOr :: [IVar] -> [Ptr] -> TOr
 argsTOr argNames argTypes = tOrFromTRec $ Map.fromList $ zip argNames (requiredList argTypes)
 
 
@@ -291,10 +317,10 @@ postPointerPrimitive kind = postPointer $ tOrPrimitive kind
 postPointer :: TOr -> CM Type
 postPointer tOr = return (xId, PrePost emptyConstraints (Map.insert xId tOr emptyConstraints))
 
-required :: IType -> TAttr
+required :: Ptr -> TAttr
 required i = (WithPtr Required i)
 
-requiredList :: [IType] -> [TAttr]
+requiredList :: [Ptr] -> [TAttr]
 requiredList = fmap required
 
 inheritPP :: PrePost -> PrePost

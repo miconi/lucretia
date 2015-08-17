@@ -87,15 +87,15 @@ showRec r = concat ["{", showFields r, "}"]
 
 
 -- * Language.Types (/Defition 2.1 (Language.Types)/ in wp)
--- in one sentence: IAttr ~> TAttr = (Definedness, IType) ~> TOr = Map Kind TSingle
+-- in one sentence: IAttr ~> TAttr = (Definedness, Ptr) ~> TOr = Map Kind TSingle
 
-type ProgrammeType = Either ErrorMsg (IType, Constraints)
+type ProgrammeType = Either ErrorMsg (Ptr, Constraints)
 
-type Type = (IType, PrePost)
+type Type = (Ptr, PrePost)
 
 -- | A mapping from type-variable names to types.
 -- List of pairs @X <# t_r@ in wp.
-type Constraints = Map IType TOr
+type Constraints = Map Ptr TOr
 
 -- Invariant: TOr can contain at most one TInt, one TString, TRec, ...
 -- This is achieved by having a Map with Kind as the type of keys.
@@ -123,7 +123,7 @@ data TSingle     = TRec TRec
 -- It is the same type as 'Env'
 type TRec = Map IAttr TAttr
 
-data TAttr = Forbidden | WithPtr Definedness IType
+data TAttr = Forbidden | WithPtr Definedness Ptr
   deriving (Eq, Ord, Show)
 
 data Definedness = Required | Optional
@@ -132,8 +132,8 @@ data Definedness = Required | Optional
 type TFun = Maybe TFunSingle
 --data TFun = Maybe TFunOr
 --type TFunOr        = Set TFunSingle
-data TFunSingle  = TFunSingle { funArgs :: [IType]
-                              , funRet  :: IType
+data TFunSingle  = TFunSingle { funArgs :: [Ptr]
+                              , funRet  :: Ptr
                               , funPP   :: FunPrePost
                               }
                  deriving ( Eq, Ord, Show )
@@ -185,22 +185,22 @@ emptyConstraints = Map.singleton env $ tOrEmptyRec
 emptyRec :: TRec
 emptyRec = Map.empty
 
-env :: IType
+env :: Ptr
 env = "Env"
 
-xId :: IType
+xId :: Ptr
 xId = "xId"
 
-aId :: IType
+aId :: Ptr
 aId = "aId"
 
-yId :: IType
+yId :: Ptr
 yId = "yId"
 
-fId :: IType
+fId :: Ptr
 fId = "fId"
 
-undefinedId :: IType
+undefinedId :: Ptr
 undefinedId = "undefinedId"
 
 toEmptyRec id = (id, tOrEmptyRec)
@@ -208,13 +208,13 @@ toEmptyRec id = (id, tOrEmptyRec)
 tOrEmptyRec :: TOr
 tOrEmptyRec = tOrFromTRec emptyRec
 
--- envToX :: IAttr -> (IType, TOr)
+-- envToX :: IAttr -> (Ptr, TOr)
 -- envToX x = toSingletonRec env x xId
 
-toSingletonRec :: IType -> IAttr -> IType -> (IType, TOr)
+toSingletonRec :: Ptr -> IAttr -> Ptr -> (Ptr, TOr)
 toSingletonRec xId a aId = (xId, tOrSingletonRec a aId)
 
-tOrSingletonRec :: IAttr -> IType -> TOr
+tOrSingletonRec :: IAttr -> Ptr -> TOr
 tOrSingletonRec a t = tOrFromTRec $ Map.singleton a (WithPtr Required t)
 
 tOrFromTSingle :: TSingle -> TOr
@@ -238,14 +238,14 @@ getEnv cs = tRec
 lookupInEnv :: IVar -> Constraints -> Maybe TAttr
 lookupInEnv x cs = Map.lookup x $ getEnv cs
 
--- | Lookup 'TOr' for a given 'IType'.
+-- | Lookup 'TOr' for a given 'Ptr'.
 --
 -- The function will return the corresponding values as @('Just' value)@,
--- or 'Nothing' if 'IType' refers to a polymorphic type.
-lookupInConstraints :: IType -> Constraints -> Maybe TOr
+-- or 'Nothing' if 'Ptr' refers to a polymorphic type.
+lookupInConstraints :: Ptr -> Constraints -> Maybe TOr
 lookupInConstraints = Map.lookup
 
-singletonConstraint :: IType -> TOr -> Constraints
+singletonConstraint :: Ptr -> TOr -> Constraints
 singletonConstraint = Map.singleton
 
 singletonTRec :: IAttr -> TAttr -> TRec

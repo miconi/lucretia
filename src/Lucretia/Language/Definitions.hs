@@ -5,14 +5,13 @@
 --
 -- Basic definitions.
 -----------------------------------------------------------------------------
-module Lucretia.Language.Definitions (IRec, IVar, IAttr, IType, ErrorMsg) where
+module Lucretia.Language.Definitions (IVar, IAttr, Ptr, ErrorMsg) where
 
 type Identifier = String
 
-type IRec  = Identifier
 type IVar  = Identifier
 type IAttr = Identifier
-type IType = Identifier
+type Ptr = Identifier
 
 type ErrorMsg = String
 

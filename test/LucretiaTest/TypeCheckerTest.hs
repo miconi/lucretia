@@ -26,12 +26,12 @@ main = defaultMain tests
 tests :: [F.Test]
 tests = hUnitTestsToFrameworkTests outputTypeTests
 
-type OutputTestDatum = ((String, Defs), String)
+type OutputTestDatum = ((String, Block), String)
 
 outputTypeTests :: [Test]
 outputTypeTests = map (uncurry map_to_ATest) outputTypeTestsData
  where 
-  map_to_ATest :: (String, Defs) -> String -> Test
+  map_to_ATest :: (String, Block) -> String -> Test
   map_to_ATest (bName, b) expectedType = TestLabel bName $ TestCase $ assertEqualShowingDiff
     ("For programme " ++ show b ++ ":")
     expectedType
@@ -72,28 +72,28 @@ outputTypeTestsData =
   , ($(nv 'bCall_recursive), "B with Constraints: [B < int, Env < {f: Z}, Z < func (F) [F < func (F)  -> I ] -> I [F < func (F)  -> I , I < int]]")
   , ($(nv 'bFun_recursive_withParams), "Z with Constraints: [Env < {f: Z}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
   , ($(nv 'bCall_recursive_withParams), "A with Constraints: [A < int, Env < {f: Z, i: A}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
-  , ($(nv 'bIf_doubleObjectCreation), "E with Constraints: [E < func (Acond) [Acond < bool] -> X [Acond < bool, X < {z: Y}, Y < {}], Env < {f: E}]")
-  , ($(nv 'bIf_mergeOfPreviouslyCreatedObjects), "Error: There are multiple variables that should be renamed to Y. Error occured while tried to get renaming from: [Env < {env: X, x: Y, y: Z}, X < {z: Z}, Y < {}, Z < {}] to: [Env < {env: X, x: Y, y: Z}, X < {z: Y}, Y < {}, Z < {}]")
-  , ($(nv 'bIf_attrUndefinedInThen), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
-  , ($(nv 'bIf_attrUndefinedInElse), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Y}, Y < {}], Env < {f: C}]")
-  , ($(nv 'bIf_varUndefinedInThen), "undefinedId with Constraints: [Env < {cond: X, optional x: Y}, X < bool, Y < {}]")
+  , ($(nv 'bIf_doubleObjectCreation), "E with Constraints: [E < func (Acond) [Acond < bool] -> X [Acond < bool, X < {z: Z}, Z < {}], Env < {f: E}]")
+  , ($(nv 'bIf_mergeOfPreviouslyCreatedObjects), "Error: There are multiple variables that should be renamed to Y. Error occured while tried to get renaming from: [A < bool, Env < {cond: A, env: X, x: Y, y: Z}, X < {z: Z}, Y < {}, Z < {}] to: [A < bool, Env < {cond: A, env: X, x: Y, y: Z}, X < {z: Y}, Y < {}, Z < {}]")
+  , ($(nv 'bIf_attrUndefinedInThen), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Z}, Z < {}], Env < {f: C}]")
+  , ($(nv 'bIf_attrUndefinedInElse), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Z}, Z < {}], Env < {f: C}]")
+  , ($(nv 'bIf_varUndefinedInThen), "undefinedId with Constraints: [Env < {cond: X, optional x: Z}, X < bool, Z < {}]")
   , ($(nv 'bIf_varUndefinedInThen_returnVar), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
-  , ($(nv 'bIf_preConstraints), "E with Constraints: [E < func (Acond, Ax) [Acond < bool, Ax < {a: X}] -> undefinedId [Acond < bool, Ax < {a: X}, Z < int], Env < {f: E}]")
-  , ($(nv 'bIf_varDefinedInBoth_inFunction), "B with Constraints: [B < func (Acond, Ay) [Acond < bool] -> X [Acond < bool, X < {}], Env < {f: B}]")
+  , ($(nv 'bIf_preConstraints), "E with Constraints: [E < func (Acond, Ax) [Acond < bool, Ax < {a: Y}] -> undefinedId [A < int, Acond < bool, Ax < {a: Y}], Env < {f: E}]")
+  , ($(nv 'bIf_varDefinedInBoth_inFunction), "B with Constraints: [B < func (Acond, Ay) [Acond < bool] -> Y [Acond < bool, Y < {}], Env < {f: B}]")
   , ($(nv 'bGetUndefinedVar_inFunction), "Error: Inside a function body a variable was referenced which may be undefined and is not in the function parameters.")
   , ($(nv 'bIf_varUndefinedInThen_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_reassignInOneBranchWithNew), "Error: Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else').")
   , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf), "Error: There are multiple variables that should be renamed from Y. Error occured while tried to get renaming from: [Env < {cond: Z, x: Y, y: Y}, X < {}, Y < {}, Z < bool] to: [Env < {cond: Z, x: X, y: Y}, X < {}, Y < {}, Z < bool]")
-  , ($(nv 'bIf_reassignInBothBranchesWithNew), "Z with Constraints: [Env < {cond: Y, x: Z}, X < {}, Y < bool, Z < {}]")
+  , ($(nv 'bIf_reassignInBothBranchesWithNew), "A with Constraints: [A < {}, Env < {cond: Y, x: A}, X < {}, Y < bool]")
   , ($(nv 'bIf_reassignInOneBranchWithTheSameVar), "X with Constraints: [Env < {cond: Y, x: X}, X < {}, Y < bool]")
   , ($(nv 'bIf_reassignInOneBranchWithNew_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
-  , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "G with Constraints: [C < func (Ax) [] -> Y [X < bool, Y < {}], D < {}, Env < {f: C, xx: D}, F < bool, G < {}]")
+  , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "G with Constraints: [C < func (Ax) [] -> Z [X < bool, Z < {}], D < {}, Env < {f: C, xx: D}, F < bool, G < {}]")
   , ($(nv 'bIf_reassignInOneBranchWithTheSameVar_inFunction), "C with Constraints: [B < func (Ax) [] -> Ax [X < bool], C < {}, E < bool, Env < {f: B, xx: C}]")
   -- , ($(nv '), "C")
   ]
 
---bSetVar_x, bSetVar_xGet_x, bSetVar_xyGet_y, bGetUndefinedVar, bNew :: Defs
+--bSetVar_x, bSetVar_xGet_x, bSetVar_xyGet_y, bGetUndefinedVar, bNew :: Block
 
 cInt = EInt 42
 cString = EString "hello"

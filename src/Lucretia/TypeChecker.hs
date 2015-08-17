@@ -15,15 +15,15 @@ import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( CM, evalCM, initState )
-import Lucretia.TypeChecker.Rules ( matchBlock )
+import Lucretia.TypeChecker.Rules ( matchProgramme )
 
 
-typeProgramme :: Defs -> ProgrammeType
+typeProgramme :: Block -> ProgrammeType
 typeProgramme b = evalCM (typeProgrammeM b)
 
-typeProgrammeM :: Defs -> CM (IType, Constraints)
+typeProgrammeM :: Block -> CM (Ptr, Constraints)
 typeProgrammeM b = do
-  (id, PrePost pre post) <- matchBlock b emptyConstraints
+  (id, PrePost pre post) <- matchProgramme b
   expectEmptyPreconditionsIn pre
   return (id, post)
 
@@ -31,6 +31,6 @@ typeProgrammeM b = do
             (pre == emptyConstraints) `orFail` ("Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: " ++ showConstraints pre)
 
 -- | Function for testing purposes, gets Pre- & Post-Constraints for a given block
-typeBlock :: Defs -> Either ErrorMsg Type
-typeBlock b = evalCM $ matchBlock b emptyConstraints
+typeBlock :: Block -> Either ErrorMsg Type
+typeBlock b = evalCM $ matchProgramme b
 

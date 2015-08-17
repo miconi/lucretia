@@ -37,8 +37,8 @@ instance Update TAttr where
   update  _            t@(WithPtr Required _ )         = return t
   update  Forbidden    t@(WithPtr Optional _ )         = return t
   update (WithPtr d i)   (WithPtr Optional i') | i==i' = return $ WithPtr d i
-  -- IType pointers should be the same here.
-  -- Renaming should throw an error when corresponding ITypes
+  -- Ptr pointers should be the same here.
+  -- Renaming should throw an error when corresponding Ptrs
   -- cannot be renamed to the same variable.
 
 
@@ -71,8 +71,8 @@ instance MergePre TSingle where
 instance MergePre TRec where
   mergePre = MapUtil.unionWithM mergePre
 instance MergePre TAttr where
-  -- IType pointers should be the same here.
-  -- Renaming should throw an error when corresponding ITypes
+  -- Ptr pointers should be the same here.
+  -- Renaming should throw an error when corresponding Ptrs
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
   mergePre t                      t'           | t == t' = return t
   mergePre t@(WithPtr Required _)    Forbidden           = cannotMerge
@@ -93,12 +93,12 @@ instance MergePost TOr where
   mergePost = MapUtil.unionWithM mergePost
 instance MergePost TSingle where
   mergePost (TRec r) (TRec r') = return . TRec =<< mergePost r r'
-  mergePost _ t = return t -- in case of a function type: just select the second function type. The error will be already thrown when trying to mergePost two IType's in renaming
+  mergePost _ t = return t -- in case of a function type: just select the second function type. The error will be already thrown when trying to mergePost two Ptr's in renaming
 instance MergePost TRec where
   mergePost = MapUtil.combineWithM mergePost
 instance MergePost (Maybe TAttr) where
-  -- IType pointers should be the same here.
-  -- Renaming should throw an error when corresponding ITypes
+  -- Ptr pointers should be the same here.
+  -- Renaming should throw an error when corresponding Ptrs
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
   mergePost  t                    t'        | t == t' = return t
   mergePost (Just Forbidden)      Nothing             = return Nothing
