@@ -15,7 +15,7 @@ import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
 import Lucretia.TypeChecker.Monad ( CM, evalCM, initState )
-import Lucretia.TypeChecker.Rules ( matchProgramme )
+import Lucretia.TypeChecker.Rules ( bindBlock )
 
 
 typeProgramme :: Block -> ProgrammeType
@@ -23,7 +23,7 @@ typeProgramme b = evalCM (typeProgrammeM b)
 
 typeProgrammeM :: Block -> CM (Ptr, Constraints)
 typeProgrammeM b = do
-  (id, PrePost pre post) <- matchProgramme b
+  (id, PrePost pre post) <- bindBlock b
   expectEmptyPreconditionsIn pre
   return (id, post)
 
@@ -32,5 +32,5 @@ typeProgrammeM b = do
 
 -- | Function for testing purposes, gets Pre- & Post-Constraints for a given block
 typeBlock :: Block -> Either ErrorMsg Type
-typeBlock b = evalCM $ matchProgramme b
+typeBlock b = evalCM $ bindBlock b
 

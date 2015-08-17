@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 {-# LANGUAGE TemplateHaskell, FlexibleInstances, FlexibleContexts #-}
 
-module Lucretia.TypeChecker.Rules ( matchProgramme ) where
+module Lucretia.TypeChecker.Rules ( bindBlock ) where
 
 import Prelude hiding ( error )
 import Control.Monad.State ( lift )
@@ -29,11 +29,11 @@ import Lucretia.TypeChecker.Update ( merge, update )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
 
-matchProgramme :: Block -> CM Type
-matchProgramme ss = bindBlockCs emptyConstraints ss
+bindBlock :: Block -> CM Type
+bindBlock ss = bindCsBlock emptyConstraints ss
 
-bindBlockCs :: Constraints -> Block -> CM Type
-bindBlockCs cs = bindBlock (undefinedId, PrePost emptyConstraints cs)
+bindCsBlock :: Constraints -> Block -> CM Type
+bindCsBlock cs = bindTypeBlock (undefinedId, PrePost emptyConstraints cs)
 
 -- | Bind Pre- & Post-Constraints 'pp' of a code block B with Type of the next statement x, producing Type of the whole Block including statement x.
 -- B x1
@@ -41,11 +41,11 @@ bindBlockCs cs = bindBlock (undefinedId, PrePost emptyConstraints cs)
 -- B ...
 -- B xN
 --   x
-bindBlock :: Type -> Block -> CM Type -- TODO OPT RTR Ptr to (Maybe Ptr)
-bindBlock t [] = return t
-bindBlock (_, pp) (s:ss) = do
+bindTypeBlock :: Type -> Block -> CM Type -- TODO OPT RTR Ptr to (Maybe Ptr)
+bindTypeBlock t [] = return t
+bindTypeBlock (_, pp) (s:ss) = do
   sT <- bindStmt pp s
-  bindBlock sT ss
+  bindTypeBlock sT ss
 
 bind :: PrePost -> Type -> CM Type
 bind ppCall (iDecl, ppDecl) = do
@@ -79,14 +79,14 @@ bindStmt pp (If x b1 b2) = do
   xId <- freshPtr
   t@(_, PrePost _ cs) <- bindPP pp (isBool x xId)
 
-  t1 <- bindBlock t b1
-  t2 <- bindBlock t b2
+  t1 <- bindTypeBlock t b1
+  t2 <- bindTypeBlock t b2
 
   mergeTypes cs t1 t2
 
 -- bindStmt pp (IfHasAttr x a b1 b2) = do
---   t1 <- matchProgramme b1 cs
---   t2 <- matchProgramme b2 cs
+--   t1 <- bindBlock b1 cs
+--   t2 <- bindBlock b2 cs
 --   branchesMerged <- mergeTypes cs t1 t2
 -- 
 --   xId <- freshPtr
@@ -253,7 +253,7 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
       let ppInherited = inheritPP ppDecl
       let argCs = addArgsCs argNames argTypes (_pre ppInherited)
 
-      (iInfered, ppInfered) <- bindBlockCs argCs funBody
+      (iInfered, ppInfered) <- bindCsBlock argCs funBody
 
       checkEmptyPreEnv ppInfered
       let ppInferedNoEnv = eraseEnv ppInfered
@@ -276,7 +276,7 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
 
     inferSignature :: [IVar] -> Block -> CM TFunSingle
     inferSignature argNames funBody = do
-      funType <- matchProgramme funBody
+      funType <- bindBlock funBody
 
       let argTypes = fmap (\n -> "A"++n) argNames
       let argCs = addArgsCs argNames argTypes emptyConstraints
