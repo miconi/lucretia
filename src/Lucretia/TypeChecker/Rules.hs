@@ -30,10 +30,10 @@ import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
 
 matchProgramme :: Block -> CM Type
-matchProgramme ss = bindBlockCs ss emptyConstraints
+matchProgramme ss = bindBlockCs emptyConstraints ss
 
-bindBlockCs :: Block -> Constraints -> CM Type
-bindBlockCs ss cs = bindBlock ss (undefinedId, PrePost emptyConstraints cs)
+bindBlockCs :: Constraints -> Block -> CM Type
+bindBlockCs cs = bindBlock (undefinedId, PrePost emptyConstraints cs)
 
 -- | Bind Pre- & Post-Constraints 'pp' of a code block B with Type of the next statement x, producing Type of the whole Block including statement x.
 -- B x1
@@ -41,11 +41,11 @@ bindBlockCs ss cs = bindBlock ss (undefinedId, PrePost emptyConstraints cs)
 -- B ...
 -- B xN
 --   x
-bindBlock :: Block -> Type -> CM Type -- TODO OPT RTR Ptr to (Maybe Ptr)
-bindBlock [] t = return t
-bindBlock (s:ss) (_, pp) = do
-  sT <- bindStmt s pp
-  bindBlock ss sT
+bindBlock :: Type -> Block -> CM Type -- TODO OPT RTR Ptr to (Maybe Ptr)
+bindBlock t [] = return t
+bindBlock (_, pp) (s:ss) = do
+  sT <- bindStmt pp s
+  bindBlock sT ss
 
 bind :: PrePost -> Type -> CM Type
 bind ppCall (iDecl, ppDecl) = do
@@ -71,20 +71,20 @@ bind ppCall (iDecl, ppDecl) = do
 bindPP :: PrePost -> PrePost -> CM Type
 bindPP ppCall ppDecl = bind ppCall (undefinedId, ppDecl)
 
-bindStmt :: Stmt -> PrePost -> CM Type
+bindStmt :: PrePost -> Stmt -> CM Type
 
 -- Binding statements inside an if statement is handled in a special way. Other statements are handled by matchStmt function.
 -- TODO If can be an expression
-bindStmt (If x b1 b2) pp = do
+bindStmt pp (If x b1 b2) = do
   xId <- freshPtr
   t@(_, PrePost _ cs) <- bindPP pp (isBool x xId)
 
-  t1 <- bindBlock b1 t
-  t2 <- bindBlock b2 t
+  t1 <- bindBlock t b1
+  t2 <- bindBlock t b2
 
   mergeTypes cs t1 t2
 
--- bindStmt (IfHasAttr x a b1 b2) pp = do
+-- bindStmt pp (IfHasAttr x a b1 b2) = do
 --   t1 <- matchProgramme b1 cs
 --   t2 <- matchProgramme b2 cs
 --   branchesMerged <- mergeTypes cs t1 t2
@@ -97,8 +97,8 @@ bindStmt (If x b1 b2) pp = do
 --   elseStarter :: IVar -> IAttr -> PrePost
 
 -- Type produced by compiling all the other statements to PrePost can be bound in the same way.
-bindStmt s pp = do
-  sT <- matchStmt s (_post pp)
+bindStmt pp s = do
+  sT <- matchStmt pp s
   bind pp sT
 
 isBool :: IVar -> Ptr -> PrePost
@@ -121,12 +121,12 @@ mergeTypes cs (_, pp1) (_, pp2) = do
       (freeVariables cs `Set.intersection` freeVariables r == Set.empty)
       `orFail` "Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else')."
 -- All @Ptr@ variables in the returned @Type@ must be fresh, so there is no risk of @Ptr@ name clashes when @'bind'ing@ @Type@ of the current @Stmt@ to the @PrePost@ of the block preceding the @Stmt@.
-matchStmt :: Stmt -> Constraints -> CM Type
+matchStmt :: PrePost -> Stmt -> CM Type
 
-matchStmt (Return e) cs = matchExpFresh e cs
+matchStmt pp (Return e) = matchExpFresh pp e
 
-matchStmt (SetVar x e) cs = do
-  (eId, ePP) <- matchExpFresh e cs
+matchStmt pp (SetVar x e) = do
+  (eId, ePP) <- matchExpFresh pp e
   let setPP = setVar x eId
   bind ePP (eId, setPP)
 
@@ -139,8 +139,8 @@ matchStmt (SetVar x e) cs = do
           where pre  = Map.fromList [ toEmptyRec     env       ]
                 post = Map.fromList [ toSingletonRec env x eId ]
 
-matchStmt (SetAttr x a e) cs = do
-  (eId, ePP) <- matchExpFresh e cs
+matchStmt pp (SetAttr x a e) = do
+  (eId, ePP) <- matchExpFresh pp e
   xId <- freshPtr
   let setPP = setAttr x xId a eId
   bind ePP (eId, setPP)
@@ -155,9 +155,9 @@ matchStmt (SetAttr x a e) cs = do
 
 
 -- | 'match' rules to an @Exp@ producing Type, then rename all @Ptrs@ to fresh variables in that type.
-matchExpFresh :: Exp  -> Constraints -> CM Type
-matchExpFresh e cs = do
-  t <- matchExp e cs
+matchExpFresh :: PrePost -> Exp -> CM Type
+matchExpFresh pp e = do
+  t <- matchExp pp e
   renameToFresh t
 
     where
@@ -177,23 +177,23 @@ matchExpFresh e cs = do
 -- B ...
 -- B eN
 --   e
-matchExp  :: Exp  -> Constraints -> CM Type
+matchExp :: PrePost -> Exp -> CM Type
 
-matchExp (EGetVar a)    _ = return (aId, PrePost constraints constraints)
+matchExp _ (EGetVar a) = return (aId, PrePost constraints constraints)
   where constraints = Map.fromList [ toSingletonRec env a aId ]
 
-matchExp (EGetAttr x a) _ = return (aId, PrePost constraints constraints)
+matchExp _ (EGetAttr x a) = return (aId, PrePost constraints constraints)
   where constraints = Map.fromList [ toSingletonRec env x xId
                                    , toSingletonRec xId a aId
                                    ]
 
-matchExp (EInt _)    _ = postPointerPrimitive KInt
-matchExp (EString _) _ = postPointerPrimitive KString
-matchExp (EBool _)   _ = postPointerPrimitive KBool
-matchExp  ENone      _ = postPointerPrimitive KNone
-matchExp  ENew       _ = postPointer tOrEmptyRec
+matchExp _ (EInt _)    = postPointerPrimitive KInt
+matchExp _ (EString _) = postPointerPrimitive KString
+matchExp _ (EBool _)   = postPointerPrimitive KBool
+matchExp _  ENone      = postPointerPrimitive KNone
+matchExp _  ENew       = postPointer tOrEmptyRec
 
-matchExp (EFunCall f xsCall) cs = do
+matchExp (PrePost _ cs) (EFunCall f xsCall) = do
   -- Pre- & post- constraints must be declared in the code.
   -- In case of other function signatures, InheritedPP should be
   -- replaced in matchExp (EFunDef ...).
@@ -231,7 +231,7 @@ matchExp (EFunCall f xsCall) cs = do
 
 
 -- TODO implement TFunOr
-matchExp (EFunDef argNames maybeSignature funBody) _ = do
+matchExp _ (EFunDef argNames maybeSignature funBody) = do
   funType <- case maybeSignature of
     Just signature -> checkSignature signature
     Nothing        -> inferSignature argNames funBody
@@ -253,7 +253,7 @@ matchExp (EFunDef argNames maybeSignature funBody) _ = do
       let ppInherited = inheritPP ppDecl
       let argCs = addArgsCs argNames argTypes (_pre ppInherited)
 
-      (iInfered, ppInfered) <- bindBlockCs funBody argCs
+      (iInfered, ppInfered) <- bindBlockCs argCs funBody
 
       checkEmptyPreEnv ppInfered
       let ppInferedNoEnv = eraseEnv ppInfered
