@@ -90,6 +90,10 @@ outputTypeTestsData =
   , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "G with Constraints: [C < func (Ax) [] -> Z [X < bool, Z < {}], D < {}, Env < {f: C, xx: D}, F < bool, G < {}]")
   , ($(nv 'bIf_reassignInOneBranchWithTheSameVar_inFunction), "C with Constraints: [B < func (Ax) [] -> Ax [X < bool], C < {}, E < bool, Env < {f: B, xx: C}]")
+  , ($(nv 'bIfHasAttr_attributeUndefined), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {optional a: Z}]")
+  , ($(nv 'bIfHasAttr_attributeDefined), "undefinedId with Constraints: [Env < {x: X}, X < {optional a: Y}, Y < int]")
+  , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInThen), "undefinedId with Constraints: [A < int, Env < {cond: Y, x: X}, X < {optional a: A, optional b: A}, Y < bool]")
+  , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInElse), "Error: Attribute is required but it was not defined.")
   -- , ($(nv '), "C")
   ]
 
@@ -204,8 +208,8 @@ bFun_withSignature_identitySetFields =
         (DeclaredPP $ PrePost
           (Map.fromList [ ("R", tOrEmptyRec)
                         ])
-          (Map.fromList [ ("R", tOrFromTRec $ Map.fromList [ ("a", (WithPtr Required "X"))
-                                                           , ("b", (WithPtr Required "Y"))
+          (Map.fromList [ ("R", tOrFromTRec $ Map.fromList [ ("a", (Required "X"))
+                                                           , ("b", (Required "Y"))
                                                            ])
                         ])
         )
@@ -474,4 +478,32 @@ bIf_reassignInOneBranchWithTheSameVar_inFunction =
   , SetVar "xx" ENew
   , Return $ EFunCall "f" ["xx"]
   ]
-
+bIfHasAttr_attributeUndefined =
+  [ SetVar "x" ENew
+  , IfHasAttr "x" "a" [ ] [ ]
+  ]
+bIfHasAttr_attributeDefined =
+  -- x = new
+  -- x.a = 42
+  -- if x hasattr a:
+  --   pass
+  -- else:
+  --   pass
+  --
+  -- [Env < {x: X}, X < {optional a: Y}, Y < int]
+  [ SetVar "x" ENew
+  , SetAttr "x" "a" cInt
+  , IfHasAttr "x" "a" [ ] [ ]
+  ]
+bIfHasAttr_attributeMaybeDefined_usedInThen =
+  [ SetVar "x" ENew
+  , SetVar "cond" (EBool True)
+  , If "cond" [ ] [ SetAttr "x" "a" cInt ]
+  , IfHasAttr "x" "a" [ SetAttr "x" "b" $ EGetAttr "x" "a" ] [ ]
+  ]
+bIfHasAttr_attributeMaybeDefined_usedInElse =
+  [ SetVar "x" ENew
+  , SetVar "cond" (EBool True)
+  , If "cond" [ ] [ SetAttr "x" "a" cInt ]
+  , IfHasAttr "x" "a" [ ] [ SetAttr "x" "b" $ EGetAttr "x" "a" ]
+  ]

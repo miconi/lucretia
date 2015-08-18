@@ -81,13 +81,13 @@ showRec :: TRec -> String
 showRec r = concat ["{", showFields r, "}"]
   where
   showFields r = intercalate ", " $ map showField $ Map.toList r
-  showField (a,  Forbidden          ) = concat ["forbidden ", a]
-  showField (a, (WithPtr Required i)) = concat [a, ": ", i]
-  showField (a, (WithPtr Optional i)) = concat ["optional ", a, ": ", i]
+  showField (a,  Forbidden  ) = concat ["forbidden ", a]
+  showField (a, (Required i)) = concat [a, ": ", i]
+  showField (a, (Optional i)) = concat ["optional ", a, ": ", i]
 
 
 -- * Language.Types (/Defition 2.1 (Language.Types)/ in wp)
--- in one sentence: IAttr ~> TAttr = (Definedness, Ptr) ~> TOr = Map Kind TSingle
+-- in one sentence: IAttr ~> TAttr = Definedness {Ptr} ~> TOr = Map Kind TSingle
 
 type ProgrammeType = Either ErrorMsg (Ptr, Constraints)
 
@@ -123,11 +123,13 @@ data TSingle     = TRec TRec
 -- It is the same type as 'Env'
 type TRec = Map IAttr TAttr
 
-data TAttr = Forbidden | WithPtr Definedness Ptr
+data TAttr = Required Ptr | Optional Ptr | Forbidden
   deriving (Eq, Ord, Show)
 
-data Definedness = Required | Optional
-  deriving (Eq, Ord, Show)
+ptrFromTAttr :: TAttr -> Ptr
+ptrFromTAttr (Required i) = i
+ptrFromTAttr (Optional i) = i
+ptrFromTAttr _ = error "ptrFromTAttr should be used only with Required & Optional TAttr."
 
 type TFun = Maybe TFunSingle
 --data TFun = Maybe TFunOr
@@ -215,7 +217,7 @@ toSingletonRec :: Ptr -> IAttr -> Ptr -> (Ptr, TOr)
 toSingletonRec xId a aId = (xId, tOrSingletonRec a aId)
 
 tOrSingletonRec :: IAttr -> Ptr -> TOr
-tOrSingletonRec a t = tOrFromTRec $ Map.singleton a (WithPtr Required t)
+tOrSingletonRec a t = tOrFromTRec $ Map.singleton a (Required t)
 
 tOrFromTSingle :: TSingle -> TOr
 tOrFromTSingle tSingle = Map.singleton (kind tSingle) tSingle

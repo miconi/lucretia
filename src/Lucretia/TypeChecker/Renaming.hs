@@ -55,8 +55,9 @@ instance FreeVariables TSingle where
   freeVariables (TRec rec) = (freeVariables . Map.elems) rec
   freeVariables _ = Set.empty
 instance FreeVariables TAttr where
-  freeVariables Forbidden = Set.empty
-  freeVariables (WithPtr _ i) = Set.singleton i
+  freeVariables (Required i) = Set.singleton i
+  freeVariables (Optional i) = Set.singleton i
+  freeVariables  Forbidden   = Set.empty
 
 -- | Renaming to actual 'Ptr' (at call) from expected 'Ptr' (at declaration).
 --
@@ -103,8 +104,9 @@ instance ApplyRenaming TSingle where
   --ar f (TFun fun) = TFun $ ar f fun
   ar _ t = t
 instance ApplyRenaming TAttr where
-  ar f Forbidden               = Forbidden
-  ar f (WithPtr definedness i) = WithPtr definedness (f i)
+  ar f (Required i) = Required (f i)
+  ar f (Optional i) = Optional (f i)
+  ar f  Forbidden   = Forbidden
 instance ApplyRenaming TFunSingle where
   ar f (TFunSingle preTs postT ppF) =
     TFunSingle 
@@ -177,11 +179,11 @@ instance GetRenaming Ptr where
         visited <- getVisited
         ((i, i') `neitherMemberOf` visited)
         modify $ Set.insert (i, i')
-        t  <- getPtrFromConstraints i  fst
-        t' <- getPtrFromConstraints i' snd
+        t  <- ptrFromTAttrFromConstraints i  fst
+        t' <- ptrFromTAttrFromConstraints i' snd
         r t t'
 
-      getPtrFromConstraints i which = do
+      ptrFromTAttrFromConstraints i which = do
         cs <- asksConstraints which
         return $ Map.lookup i cs
 
@@ -227,13 +229,11 @@ instance GetRenaming TAttr where
       BindRenaming freshVariables -> rBind a a' freshVariables
 
     where
-      rFull (WithPtr _        i) (WithPtr _        i') = r i i'
+      rFull a a' = r (ptrFromTAttr a) (ptrFromTAttr a')
 
-      rBind (WithPtr Optional i) (WithPtr Required i') freshVariables =
+      rBind (Optional i) (Required i') freshVariables =
         if i `Set.member` freshVariables
           then throwError $ "Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined)."
           else r i i'
-      rBind (WithPtr _        i) (WithPtr _        i') _ = r i i'
-
-
+      rBind a a' _ = rFull a a'
 

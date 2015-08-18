@@ -83,10 +83,10 @@ wTAttr :: Maybe TAttr -> Maybe TAttr -> CM (Maybe TAttr)
 -- Nothing as a result means that the 'weaker' relation holds
 -- (without a need to add any conditions).
 wTAttr Nothing t = return t
-wTAttr (Just (WithPtr Optional i)) t@(Just (WithPtr Required i')) | i==i' = return t
-wTAttr (Just (WithPtr Optional _))   (Just (WithPtr Required _ )) = throwError "Attribute is required but it may be undefined."
-wTAttr (Just (WithPtr Optional _))   (Just Forbidden)             = throwError "Attribute is forbidden but it may have been defined."
-wTAttr (Just (WithPtr Required _))   (Just Forbidden)             = throwError "Attribute is forbidden but it was defined."
-wTAttr (Just Forbidden)              (Just (WithPtr Required _))  = throwError "Attribute is required but it was not defined."
+wTAttr (Just (Optional i)) t@(Just (Required i')) | i==i' = return t
+wTAttr (Just (Optional _))   (Just (Required _ )) = throwError "Attribute is required but it may be undefined."
+wTAttr (Just (Optional _))   (Just  Forbidden   ) = throwError "Attribute is forbidden but it may have been defined."
+wTAttr (Just (Required _))   (Just  Forbidden   ) = throwError "Attribute is forbidden but it was defined."
+wTAttr (Just  Forbidden  )   (Just (Required _ )) = throwError "Attribute is required but it was not defined."
 wTAttr _ _ = return Nothing
 

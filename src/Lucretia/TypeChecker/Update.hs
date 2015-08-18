@@ -33,10 +33,11 @@ instance Update (Maybe TSingle) where
 instance Update TRec where
   update = MapUtil.unionWithM update
 instance Update TAttr where
-  update  _               Forbidden                    = return Forbidden
-  update  _            t@(WithPtr Required _ )         = return t
-  update  Forbidden    t@(WithPtr Optional _ )         = return t
-  update (WithPtr d i)   (WithPtr Optional i') | i==i' = return $ WithPtr d i
+  update  _                 Forbidden            = return Forbidden
+  update  _              t@(Required _ )         = return t
+  update  Forbidden      t@(Optional _ )         = return t
+  update t@(Required i)    (Optional i') | i==i' = return t
+  update t@(Optional i)    (Optional i') | i==i' = return t
   -- Ptr pointers should be the same here.
   -- Renaming should throw an error when corresponding Ptrs
   -- cannot be renamed to the same variable.
@@ -75,10 +76,10 @@ instance MergePre TAttr where
   -- Renaming should throw an error when corresponding Ptrs
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
   mergePre t                      t'           | t == t' = return t
-  mergePre t@(WithPtr Required _)    Forbidden           = cannotMerge
-  mergePre    Forbidden           t@(WithPtr Required _) = cannotMerge
-  mergePre   (WithPtr Optional _) t                      = return t
-  mergePre t                        (WithPtr Optional _) = return t
+  mergePre t@(Required _)    Forbidden           = cannotMerge
+  mergePre    Forbidden           t@(Required _) = cannotMerge
+  mergePre   (Optional _) t                      = return t
+  mergePre t                        (Optional _) = return t
 
 cannotMerge = throwError $ "When merging preconditions from if branches: an attribute cannot be both required and forbidden."
 
@@ -100,9 +101,11 @@ instance MergePost (Maybe TAttr) where
   -- Ptr pointers should be the same here.
   -- Renaming should throw an error when corresponding Ptrs
   -- from 'then' & 'else' branches cannot be renamed to the same variable.
-  mergePost  t                    t'        | t == t' = return t
-  mergePost (Just Forbidden)      Nothing             = return Nothing
-  mergePost  Nothing             (Just Forbidden)     = return Nothing
-  mergePost  _                   (Just (WithPtr _ i)) = return . Just $ WithPtr Optional i
-  mergePost (Just (WithPtr _ i))  _                   = return . Just $ WithPtr Optional i
+  mergePost  t                t'    | t == t' = return t
+  mergePost (Just Forbidden)  Nothing         = return Nothing
+  mergePost  Nothing         (Just Forbidden) = return Nothing
+  -- mergePost (Just Forbidden) (Just (Required _)) = return Nothing
+  -- mergePost (Just (Required _)) (Just Forbidden) = return Nothing
+  mergePost  _               (Just a        ) | a /= Forbidden = return . Just . Optional $ ptrFromTAttr a
+  mergePost (Just a        )  _               | a /= Forbidden = return . Just . Optional $ ptrFromTAttr a
 

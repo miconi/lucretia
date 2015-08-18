@@ -84,17 +84,34 @@ bindStmt pp (If x b1 b2) = do
 
   mergeTypes cs t1 t2
 
--- bindStmt pp (IfHasAttr x a b1 b2) = do
---   t1 <- bindBlock b1 cs
---   t2 <- bindBlock b2 cs
---   branchesMerged <- mergeTypes cs t1 t2
--- 
---   xId <- freshPtr
---   bind (isBool x xId) branchesMerged
--- 
---   where 
---   thenStarter :: IVar -> IAttr -> PrePost
---   elseStarter :: IVar -> IAttr -> PrePost
+bindStmt pp@(PrePost _ cs) (IfHasAttr x a b1 b2) = do
+  xId <- freshPtr
+  aId <- freshPtr
+
+  t1  <- bindPP pp (thenStarter x xId a aId)
+  t2  <- bindPP pp (elseStarter x xId a aId)
+
+  t1' <- bindTypeBlock t1 b1
+  t2' <- bindTypeBlock t2 b2
+
+  mergeTypes cs t1' t2'
+
+  where 
+  thenStarter :: IVar -> Ptr -> IAttr -> Ptr -> PrePost
+  thenStarter x xId a aId = PrePost (preStarter x xId a aId) $
+    Map.fromList [ toSingletonRec env x xId
+                 , (xId, tOrFromTRec $ Map.singleton a (Required aId))
+                 ]
+  elseStarter :: IVar -> Ptr -> IAttr -> Ptr -> PrePost
+  elseStarter x xId a aId = PrePost (preStarter x xId a aId) $
+    Map.fromList [ toSingletonRec env x xId
+                 , (xId, tOrFromTRec $ Map.singleton a  Forbidden    )
+                 ]
+  preStarter :: IVar -> Ptr -> IAttr -> Ptr -> Constraints
+  preStarter x xId a aId =
+    Map.fromList [ toSingletonRec env x xId
+                 , (xId, tOrFromTRec $ Map.singleton a (Optional aId))
+                 ]
 
 -- Type produced by compiling all the other statements to PrePost can be bound in the same way.
 bindStmt pp s = do
@@ -211,8 +228,8 @@ matchExp (PrePost _ cs) (EFunCall f xsCall) = do
       case f `lookupInEnv` cs of
         Nothing                      -> error pleaseDefineSignature
         Just Forbidden               -> error pleaseDefineSignature
-        Just (WithPtr Optional _   ) -> error $ "Function "++f++" may be undefined."
-        Just (WithPtr Required ifun) -> case ifun `lookupInConstraints` cs of
+        Just (Optional _   ) -> error $ "Function "++f++" may be undefined."
+        Just (Required ifun) -> case ifun `lookupInConstraints` cs of
            Just tfun -> unwrapFunFromOr tfun
            Nothing   -> error pleaseDefineSignature 
         where pleaseDefineSignature = "Please declare signature for the function "++f++". Infering type of a function passed as a parameter to another function (higher order function type inference) is not supported yet."
@@ -318,7 +335,7 @@ postPointer :: TOr -> CM Type
 postPointer tOr = return (xId, PrePost emptyConstraints (Map.insert xId tOr emptyConstraints))
 
 required :: Ptr -> TAttr
-required i = (WithPtr Required i)
+required i = (Required i)
 
 requiredList :: [Ptr] -> [TAttr]
 requiredList = fmap required
