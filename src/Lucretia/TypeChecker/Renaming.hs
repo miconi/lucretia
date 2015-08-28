@@ -40,9 +40,6 @@ class FreeVariables a where
   freeVariables :: a -> Set Ptr
 instance FreeVariables Renaming where
   freeVariables r = Set.map fst r `Set.union` Set.map snd r
-instance FreeVariables FunPrePost where
-  freeVariables (DeclaredPP pp) = freeVariables pp
-  freeVariables InheritedPP = Set.empty
 instance FreeVariables PrePost where
   freeVariables (PrePost pre post) = (Set.union `on` freeVariables) pre post
 instance FreeVariables Constraints where
@@ -53,11 +50,20 @@ instance FreeVariables TOr where
   freeVariables = freeVariables . Map.elems
 instance FreeVariables TSingle where
   freeVariables (TRec rec) = (freeVariables . Map.elems) rec
+  freeVariables (TFun fun) = freeVariables fun
   freeVariables _ = Set.empty
 instance FreeVariables TAttr where
   freeVariables (Required i) = Set.singleton i
   freeVariables (Optional i) = Set.singleton i
   freeVariables  Forbidden   = Set.empty
+instance FreeVariables TFunSingle where
+  freeVariables (TFunSingle argTypes iDecl funPP) =
+    Set.fromList argTypes `Set.union`
+    Set.singleton iDecl `Set.union`
+    freeVariables funPP
+instance FreeVariables FunPrePost where
+  freeVariables (DeclaredPP pp) = freeVariables pp
+  freeVariables InheritedPP = Set.empty
 
 -- | Renaming to actual 'Ptr' (at call) from expected 'Ptr' (at declaration).
 --
@@ -101,7 +107,7 @@ instance ApplyRenaming TOr where
   ar f = Map.map (ar f)
 instance ApplyRenaming TSingle where
   ar f (TRec rec) = TRec $ Map.map (ar f) rec
-  --ar f (TFun fun) = TFun $ ar f fun
+  ar f (TFun fun) = TFun $ ar f fun
   ar _ t = t
 instance ApplyRenaming TAttr where
   ar f (Required i) = Required (f i)

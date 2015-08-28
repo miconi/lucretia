@@ -15,7 +15,7 @@ import Data.Map as Map hiding ( update )
 import Data.Set as Set
 import Data.Function ( on )
 
-import Util.Debug ( traceShowIdHlWith )
+import Util.Debug ( traceShowIdHl, traceShowIdHlWith )
 import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
@@ -256,17 +256,19 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
 
   where
     checkSignature :: TFunSingle -> CM TFunSingle
-    checkSignature decl@(TFunSingle argTypes iDecl (DeclaredPP ppDecl)) = do
+    checkSignature decl = do
       -- pre- & post- constraints must be declared in the code
       -- that should be checked by Lucretia parser
       -- case maybePPDecl of
       --   InheritedPP -> error $ "Containig function must declare pre- and post-constraints."
       --   DeclaredPP ppDecl ->
       --     do
-      --
-      -- We are adding pre-constraints from the function signature
-      -- to make available at the call site the signatures
-      -- of the functions passed as parameters
+
+      let TFunSingle argTypes iDecl (DeclaredPP ppDecl) = renameToUnique decl
+
+      -- We are adding pre-constraints from the function signature to make
+      -- signatures of the functions passed as parameters available at their
+      -- call site.
       let ppInherited = inheritPP ppDecl
       let argCs = addArgsCs argNames argTypes (_pre ppInherited)
 
@@ -276,19 +278,32 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
       let ppInferedNoEnv = eraseEnv ppInfered
 
       checkPre ppInherited ppInferedNoEnv
-      checkPost argNames iInfered (_post ppInferedNoEnv) iDecl (_post ppInherited)
+      checkPost argTypes iInfered (_post ppInferedNoEnv) iDecl (_post ppInherited)
 
-      -- TODO clean constraints
       return decl
+
+        where
+        -- | Add a prefix "S" to all the type variables so that their names do
+        -- not clash with the fresh variables used later on.
+        renameToUnique :: TFunSingle -> TFunSingle
+        renameToUnique t =
+          let usedPtrs = freeVariables t in
+          let renaming = Set.map (\id -> ("S"++id, id)) usedPtrs in
+          applyRenaming renaming t
 
     checkPre = checkWeaker `on` _pre
 
     checkPost :: [Ptr] -> Ptr -> Constraints -> Ptr -> Constraints -> CM ()
-    checkPost argNames iInfered csInfered iDecl csDecl = do
-      renaming <- getRenaming FullRenaming (iDecl:argNames, csDecl) (iInfered:argNames, csInfered)
-      (iDecl == applyRenaming renaming iInfered) `orFail`
+    checkPost argTypes iInfered csInfered iDecl csDecl = do
+      renaming <- getRenaming FullRenaming
+                              (iDecl   :argTypes, csDecl   )
+                              (iInfered:argTypes, csInfered)
+      (iDecl == applyRenaming renaming iInfered)
+        `orFail`
         ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
-      applyRenaming renaming csInfered `checkWeaker` csDecl
+      applyRenaming renaming (traceShowIdHlWith showConstraints csInfered)
+        `checkWeaker`
+        (traceShowIdHlWith showConstraints csDecl)
             
 
     inferSignature :: [IVar] -> Block -> CM TFunSingle
@@ -303,7 +318,12 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
       checkEmptyPreEnv funBodyPP
       let funBodyNoEnvPP = eraseEnv funBodyPP
 
-      -- TODO clean constraints
+      -- Here we could clean the post-constraints from the garbage variables
+      -- created inside the function body (they do not add anything to the
+      -- function signature and they only clutter the infered signature) but
+      -- there is no garbage collection for variables defined in the Lucretia
+      -- type system.
+
       return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
 
     -- | Checks that no variable was referenced, apart from the arguments

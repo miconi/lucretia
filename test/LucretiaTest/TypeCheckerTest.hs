@@ -57,29 +57,29 @@ outputTypeTestsData =
   , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Get_yb), "Y with Constraints: [A < {b: Y}, Env < {x: X, y: A}, X < {a: Y}, Y < int]")
   , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb), "Y with Constraints: [A < {b: Y}, E < string, Env < {x: X, y: A}, X < {a: E}, Y < int]")
   , ($(nv 'bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya), "Z with Constraints: [Env < {x: X, y: X}, X < {a: Z}, Z < int]")
-  , ($(nv 'bFun_identity), "Y with Constraints: [Env < {identity: Y}, Y < func (Ax) [] -> Ax []]")
-  , ($(nv 'bFun_identitySetFields), "C with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], Env < {identitySetFields: C}]")
-  , ($(nv 'bFun_withSignature_identity), "Y with Constraints: [Env < {identity: Y}, Y < func (X) [] -> X []]")
-  , ($(nv 'bFun_withSignature_identitySetFields), "C with Constraints: [C < func (R, X, Y) [R < {}] -> R [R < {a: X, b: Y}], Env < {identitySetFields: C}]")
-  , ($(nv 'bFun_withSignature_tooStrongPre), "Error: Constraints: [] should be weaker or equal to [X < {a: X}]")
-  , ($(nv 'bFun_withSignature_tooStrongPost), "Error: Constraints: [] should be weaker or equal to [X < {a: Y}]")
+  , ($(nv 'bFun_identity), "Z with Constraints: [Env < {identity: Z}, Z < func (Y) [] -> Y []]")
+  , ($(nv 'bFun_identitySetFields), "F with Constraints: [Env < {identitySetFields: F}, F < func (C, D, E) [C < {}] -> C [C < {a: D, b: E}]]")
+  , ($(nv 'bFun_withSignature_identity), "Z with Constraints: [Env < {identity: Z}, Z < func (Y) [] -> Y []]")
+  , ($(nv 'bFun_withSignature_identitySetFields), "F with Constraints: [Env < {identitySetFields: F}, F < func (C, D, E) [C < {}] -> C [C < {a: D, b: E}]]")
+  , ($(nv 'bFun_withSignature_tooStrongPre), "Error: Constraints: [] should be weaker or equal to [SX < {a: X}]")
+  , ($(nv 'bFun_withSignature_tooStrongPost), "Error: Constraints: [] should be weaker or equal to [SX < {a: SY}]")
   , ($(nv 'bFun_identityNested), "Error: Please declare signature for the function identity. Infering type of a function passed as a parameter to another function (higher order function type inference) is not supported yet.")
-  , ($(nv 'bFun_withSignature_identityNested), "Y with Constraints: [Env < {identityNested: Y}, Y < func (X, Identity) [Identity < func (X) [] -> X []] -> X [Identity < func (X) [] -> X []]]")
-  , ($(nv 'bCall_identity), "Z with Constraints: [Env < {i: Z, identity: Y}, Y < func (Ax) [] -> Ax [], Z < int]")
-  , ($(nv 'bCall_identitySetFields), "D with Constraints: [C < func (Ar, Ax, Ay) [Ar < {}] -> Ar [Ar < {a: Ax, b: Ay}], D < {a: E, b: F}, E < int, Env < {i: E, identitySetFields: C, s: F, x: D}, F < string]")
-  , ($(nv 'bCall_withSignature_identityNested), "B with Constraints: [A < func (X) [] -> X [], B < int, Env < {i: B, identity: A, identityNested: Y}, Y < func (X, Identity) [Identity < func (X) [] -> X []] -> X [Identity < func (X) [] -> X []]]")
-  , ($(nv 'bFun_recursive), "Z with Constraints: [Env < {f: Z}, Z < func (F) [F < func (F)  -> I ] -> I [F < func (F)  -> I , I < int]]")
-  , ($(nv 'bCall_recursive), "B with Constraints: [B < int, Env < {f: Z}, Z < func (F) [F < func (F)  -> I ] -> I [F < func (F)  -> I , I < int]]")
-  , ($(nv 'bFun_recursive_withParams), "Z with Constraints: [Env < {f: Z}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
-  , ($(nv 'bCall_recursive_withParams), "A with Constraints: [A < int, Env < {f: Z, i: A}, Z < func (F, I) [F < func (F, I)  -> I ] -> I [F < func (F, I)  -> I , I < int]]")
-  , ($(nv 'bIf_doubleObjectCreation), "E with Constraints: [E < func (Acond) [Acond < bool] -> X [Acond < bool, X < {z: Z}, Z < {}], Env < {f: E}]")
+  , ($(nv 'bFun_withSignature_identityNested), "A with Constraints: [A < func (Z, Y) [Y < func (Z) [] -> Z []] -> Z [Y < func (Z) [] -> Z []], Env < {identityNested: A}]")
+  , ($(nv 'bCall_identity), "A with Constraints: [A < int, Env < {i: A, identity: Z}, Z < func (Y) [] -> Y []]")
+  , ($(nv 'bCall_identitySetFields), "G with Constraints: [Env < {i: H, identitySetFields: F, s: I, x: G}, F < func (C, D, E) [C < {}] -> C [C < {a: D, b: E}], G < {a: H, b: I}, H < int, I < string]")
+  , ($(nv 'bCall_withSignature_identityNested), "E with Constraints: [A < func (Z, Y) [Y < func (Z) [] -> Z []] -> Z [Y < func (Z) [] -> Z []], D < func (E) [] -> E [], E < int, Env < {i: E, identity: D, identityNested: A}]")
+  , ($(nv 'bFun_recursive), "B with Constraints: [B < func (Z) [Z < func (Z)  -> A ] -> A [A < int, Z < func (Z)  -> A ], Env < {f: B}]")
+  , ($(nv 'bCall_recursive), "C with Constraints: [B < func (B) [B < func (B)  -> C ] -> C [B < func (B)  -> C , C < int], C < int, Env < {f: B}]")
+  , ($(nv 'bFun_recursive_withParams), "B with Constraints: [B < func (Z, A) [Z < func (Z, A)  -> A ] -> A [A < int, Z < func (Z, A)  -> A ], Env < {f: B}]")
+  , ($(nv 'bCall_recursive_withParams), "C with Constraints: [B < func (B, C) [B < func (B, C)  -> C ] -> C [B < func (B, C)  -> C , C < int], C < int, Env < {f: B, i: C}]")
+  , ($(nv 'bIf_doubleObjectCreation), "H with Constraints: [Env < {f: H}, H < func (E) [E < bool] -> F [E < bool, F < {z: G}, G < {}]]")
   , ($(nv 'bIf_mergeOfPreviouslyCreatedObjects), "Error: There are multiple variables that should be renamed to Y. Error occured while tried to get renaming from: [A < bool, Env < {cond: A, env: X, x: Y, y: Z}, X < {z: Z}, Y < {}, Z < {}] to: [A < bool, Env < {cond: A, env: X, x: Y, y: Z}, X < {z: Y}, Y < {}, Z < {}]")
-  , ($(nv 'bIf_attrUndefinedInThen), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Z}, Z < {}], Env < {f: C}]")
-  , ($(nv 'bIf_attrUndefinedInElse), "C with Constraints: [C < func (Acond) [Acond < bool] -> X [Acond < bool, X < {optional z: Z}, Z < {}], Env < {f: C}]")
+  , ($(nv 'bIf_attrUndefinedInThen), "F with Constraints: [Env < {f: F}, F < func (C) [C < bool] -> D [C < bool, D < {optional z: E}, E < {}]]")
+  , ($(nv 'bIf_attrUndefinedInElse), "F with Constraints: [Env < {f: F}, F < func (C) [C < bool] -> D [C < bool, D < {optional z: E}, E < {}]]")
   , ($(nv 'bIf_varUndefinedInThen), "undefinedId with Constraints: [Env < {cond: X, optional x: Z}, X < bool, Z < {}]")
   , ($(nv 'bIf_varUndefinedInThen_returnVar), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
-  , ($(nv 'bIf_preConstraints), "E with Constraints: [E < func (Acond, Ax) [Acond < bool, Ax < {a: Y}] -> undefinedId [A < int, Acond < bool, Ax < {a: Y}], Env < {f: E}]")
-  , ($(nv 'bIf_varDefinedInBoth_inFunction), "B with Constraints: [B < func (Acond, Ay) [Acond < bool] -> Y [Acond < bool, Y < {}], Env < {f: B}]")
+  , ($(nv 'bIf_preConstraints), "J with Constraints: [Env < {f: J}, J < func (F, G) [F < bool, G < {a: H}] -> I [E < int, F < bool, G < {a: H}]]")
+  , ($(nv 'bIf_varDefinedInBoth_inFunction), "E with Constraints: [E < func (B, C) [B < bool] -> D [B < bool, D < {}], Env < {f: E}]")
   , ($(nv 'bGetUndefinedVar_inFunction), "Error: Inside a function body a variable was referenced which may be undefined and is not in the function parameters.")
   , ($(nv 'bIf_varUndefinedInThen_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_reassignInOneBranchWithNew), "Error: Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else').")
@@ -88,12 +88,16 @@ outputTypeTestsData =
   , ($(nv 'bIf_reassignInOneBranchWithTheSameVar), "X with Constraints: [Env < {cond: Y, x: X}, X < {}, Y < bool]")
   , ($(nv 'bIf_reassignInOneBranchWithNew_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
-  , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "G with Constraints: [C < func (Ax) [] -> Z [X < bool, Z < {}], D < {}, Env < {f: C, xx: D}, F < bool, G < {}]")
-  , ($(nv 'bIf_reassignInOneBranchWithTheSameVar_inFunction), "C with Constraints: [B < func (Ax) [] -> Ax [X < bool], C < {}, E < bool, Env < {f: B, xx: C}]")
+  , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "J with Constraints: [Env < {f: F, xx: G}, F < func (C) [] -> E [D < bool, E < {}], G < {}, I < bool, J < {}]")
+  , ($(nv 'bIf_reassignInOneBranchWithTheSameVar_inFunction), "E with Constraints: [D < func (B) [] -> B [C < bool], E < {}, Env < {f: D, xx: E}, G < bool]")
   , ($(nv 'bIfHasAttr_attributeUndefined), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {optional a: Z}]")
   , ($(nv 'bIfHasAttr_attributeDefined), "undefinedId with Constraints: [Env < {x: X}, X < {optional a: Y}, Y < int]")
   , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInThen), "undefinedId with Constraints: [A < int, Env < {cond: Y, x: X}, X < {optional a: A, optional b: A}, Y < bool]")
   , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInElse), "Error: Attribute is required but it was not defined.")
+  , ($(nv 'bFun_withSignature_intersectionExample_firstSignature), "F with Constraints: [Env < {f: F}, F < func (D, E) [D < {}, E < {a: C}] -> C [B < int, D < {a: B}, E < {a: C}]]")
+  , ($(nv 'bCall_withSignature_intersectionExample_firstSignature), "I with Constraints: [Env < {f: F, xx: G, yy: H}, F < func (D, E) [D < {}, E < {a: C}] -> C [B < int, D < {a: B}, E < {a: C}], G < {a: K}, H < {a: I}, I < bool, K < int]")
+  , ($(nv 'bFun_withSignature_intersectionExample_secondSignature), "D with Constraints: [D < func (C, C) [C < {}] -> B [B < int, C < {a: B}], Env < {f: D}]")
+  , ($(nv 'bCall_withSignature_intersectionExample_secondSignature), "F with Constraints: [D < func (C, C) [C < {}] -> B [B < int, C < {a: B}], E < {a: F}, Env < {f: D, xx: E}, F < int]")
   -- , ($(nv '), "C")
   ]
 
@@ -495,6 +499,24 @@ bIfHasAttr_attributeDefined =
   , SetAttr "x" "a" cInt
   , IfHasAttr "x" "a" [ ] [ ]
   ]
+  -- x = new
+  -- x.a = 42
+  --
+  -- // {x: X}, [X < {a: int}]
+  -- // after weakening:
+  -- // {x: X}, [X < {a v _|_: int}]
+  --
+  -- if x hasattr a:
+  --   pass
+  -- else:
+  --   x.b = 7
+  --
+  -- // two possible typings:
+  -- // 1) after (ifhttr+)
+  -- //   {x: X}, [X < {a: int}]
+  -- // 2) after (ifhttr)
+  -- //   {x: X}, [X < {a: int v _|_, b: int v _|_}]
+
 bIfHasAttr_attributeMaybeDefined_usedInThen =
   [ SetVar "x" ENew
   , SetVar "cond" (EBool True)
@@ -507,3 +529,52 @@ bIfHasAttr_attributeMaybeDefined_usedInElse =
   , If "cond" [ ] [ SetAttr "x" "a" cInt ]
   , IfHasAttr "x" "a" [ ] [ SetAttr "x" "b" $ EGetAttr "x" "a" ]
   ]
+bFun_withSignature_intersectionExample_firstSignature =
+  [ SetVar "f" $
+      EFunDef ["x", "y"]
+      -- func (X, Y) [X < {}, Y < {a: U}] -> U [X < {a: I}, Y < {a: U}, I < int]
+      (Just $ TFunSingle ["X", "Y"] "U"
+        (DeclaredPP $ PrePost
+          (Map.fromList [ ("X", tOrEmptyRec)
+                        , ("Y", tOrFromTRec $ Map.fromList [ ("a", (Required "U")) ])
+                        ])
+          (Map.fromList [ ("X", tOrFromTRec $ Map.fromList [ ("a", (Required "I")) ])
+                        , ("I", tOrPrimitive KInt)
+                        , ("Y", tOrFromTRec $ Map.fromList [ ("a", (Required "U")) ])
+                        ])
+        )
+      )
+      [ SetAttr "x" "a" cInt
+      , Return $ EGetAttr "y" "a"
+      ]
+  ]
+bCall_withSignature_intersectionExample_firstSignature =
+  bFun_withSignature_intersectionExample_firstSignature ++
+  [ SetVar "xx" ENew
+  , SetVar "yy" ENew
+  , SetAttr "yy" "a" (EBool True)
+  , Return $ EFunCall "f" ["xx", "yy"]
+  ]
+bFun_withSignature_intersectionExample_secondSignature =
+  [ SetVar "f" $
+      EFunDef ["x", "y"]
+      -- func (X, X) [X < {}] -> I [I < int, X < {a: I}]
+      (Just $ TFunSingle ["X", "X"] "I"
+        (DeclaredPP $ PrePost
+          (Map.fromList [ ("X", tOrEmptyRec)
+                        ])
+          (Map.fromList [ ("X", tOrFromTRec $ Map.fromList [ ("a", (Required "I")) ])
+                        , ("I", tOrPrimitive KInt)
+                        ])
+        )
+      )
+      [ SetAttr "x" "a" cInt
+      , Return $ EGetAttr "y" "a"
+      ]
+  ]
+bCall_withSignature_intersectionExample_secondSignature =
+  bFun_withSignature_intersectionExample_secondSignature ++
+  [ SetVar "xx" ENew
+  , Return $ EFunCall "f" ["xx", "xx"]
+  ]
+

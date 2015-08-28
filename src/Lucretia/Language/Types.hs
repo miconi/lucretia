@@ -132,8 +132,7 @@ ptrFromTAttr (Optional i) = i
 ptrFromTAttr _ = error "ptrFromTAttr should be used only with Required & Optional TAttr."
 
 type TFun = Maybe TFunSingle
---data TFun = Maybe TFunOr
---type TFunOr        = Set TFunSingle
+--data TFun = Set TFunSingle
 data TFunSingle  = TFunSingle { funArgs :: [Ptr]
                               , funRet  :: Ptr
                               , funPP   :: FunPrePost
