@@ -24,7 +24,6 @@ import Control.Monad.Error ( runErrorT, throwError, ErrorT )
 import Control.Monad.Identity ( runIdentity, Identity )
 import Control.Monad.State ( execStateT, get, lift, modify, StateT )
 import Control.Monad.Trans.Reader ( ask, asks, ReaderT, runReaderT )
-import Data.Traversable ( sequence )
 
 import Util.Map ( findAll )
 import Util.OrFail ( orFail )
@@ -50,7 +49,7 @@ instance FreeVariables TOr where
   freeVariables = freeVariables . Map.elems
 instance FreeVariables TSingle where
   freeVariables (TRec rec) = (freeVariables . Map.elems) rec
-  freeVariables (TFun fun) = freeVariables fun
+  freeVariables (TFun ts) = Set.unions $ fmap freeVariables ts
   freeVariables _ = Set.empty
 instance FreeVariables TAttr where
   freeVariables (Required i) = Set.singleton i
@@ -113,6 +112,8 @@ instance ApplyRenaming TAttr where
   ar f (Required i) = Required (f i)
   ar f (Optional i) = Optional (f i)
   ar f  Forbidden   = Forbidden
+instance ApplyRenaming TFun where
+  ar f = fmap (ar f)
 instance ApplyRenaming TFunSingle where
   ar f (TFunSingle preTs postT ppF) =
     TFunSingle 

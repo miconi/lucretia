@@ -30,7 +30,7 @@ import Util.MapLenses (mapInsertLens)
 
 showProgrammeType :: ProgrammeType -> String
 showProgrammeType (Left msg) = "Error: "++msg
-showProgrammeType (Right (i, cs)) = i++" with Constraints: "++showConstraints cs
+showProgrammeType (Right ts) = intercalate " AND " $ fmap (\(i, cs) -> i++" with Constraints: "++showConstraints cs) ts
 
 showType :: Type -> String
 showType (i, pp) = i++", "++showPrePost pp
@@ -61,9 +61,12 @@ showKind (KRec, TRec t) = showRec t
 showKind (KFun, TFun f) = showFun f
 showKind other          = show other
 
-showFun :: TFunSingle -> String
-showFun (TFunSingle argIds returnId funPP) = concat
-  [ "func ("
+showFun :: TFun -> String
+showFun ts = "func " ++ intercalate " and " (map showFunSingle ts)
+
+showFunSingle :: TFunSingle -> String
+showFunSingle (TFunSingle argIds returnId funPP) = concat
+  [ "("
   , intercalate ", " argIds
   , ") "
   , showFunPP _pre  funPP
@@ -89,9 +92,10 @@ showRec r = concat ["{", showFields r, "}"]
 -- * Language.Types (/Defition 2.1 (Language.Types)/ in wp)
 -- in one sentence: IAttr ~> TAttr = Definedness {Ptr} ~> TOr = Map Kind TSingle
 
-type ProgrammeType = Either ErrorMsg (Ptr, Constraints)
+type ProgrammeType = Either ErrorMsg [(Ptr, Constraints)]
 
 type Type = (Ptr, PrePost)
+type Types = [Type]
 
 -- | A mapping from type-variable names to types.
 -- List of pairs @X <# t_r@ in wp.
@@ -112,8 +116,7 @@ data Kind        = KInt
                  deriving ( Eq, Ord, Show )
 
 data TSingle     = TRec TRec
-                 -- | TFunOr TFunOr --TODO intersection types
-                 | TFun TFunSingle
+                 | TFun TFun
                  | TPrimitive -- kind without parameters
 
                  deriving ( Eq, Ord, Show )
@@ -131,8 +134,7 @@ ptrFromTAttr (Required i) = i
 ptrFromTAttr (Optional i) = i
 ptrFromTAttr _ = error "ptrFromTAttr should be used only with Required & Optional TAttr."
 
-type TFun = Maybe TFunSingle
---data TFun = Set TFunSingle
+type TFun = [TFunSingle]
 data TFunSingle  = TFunSingle { funArgs :: [Ptr]
                               , funRet  :: Ptr
                               , funPP   :: FunPrePost
@@ -150,6 +152,7 @@ data PrePost = PrePost { _pre  :: Constraints
                        , _post :: Constraints
                        }
                  deriving ( Eq, Ord )
+type PrePosts = [PrePost]
 
 instance Show PrePost where
   show = showPrePost
@@ -224,11 +227,11 @@ tOrFromTSingle tSingle = Map.singleton (kind tSingle) tSingle
 tOrFromTRec :: TRec -> TOr
 tOrFromTRec = tOrFromTSingle . TRec
 
-tOrFromTFun :: TFunSingle -> TOr
+tOrFromTFun :: TFun -> TOr
 tOrFromTFun = tOrFromTSingle . TFun
 
 tOrFromTFunSingle :: TFunSingle -> TOr
-tOrFromTFunSingle = tOrFromTSingle . TFun
+tOrFromTFunSingle t = tOrFromTFun [t]
 
 -- | "env" type pointer is always present in Constraints and it is always a record
 getEnv :: Constraints -> TRec

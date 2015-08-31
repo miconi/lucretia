@@ -9,7 +9,10 @@
 
 module Lucretia.TypeChecker.Rules ( bindBlock ) where
 
-import Prelude hiding ( error )
+import Prelude hiding ( error, sequence )
+import Data.Traversable ( sequence )
+
+import Control.Monad.List ( runListT, ListT, ListT(..) )
 import Control.Monad.State ( lift )
 import Data.Map as Map hiding ( update )
 import Data.Set as Set
@@ -22,18 +25,23 @@ import Lucretia.Language.Definitions
 import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
-import Lucretia.TypeChecker.Monad ( error, freshPtr, CM )
-import Lucretia.TypeChecker.Monad ( freshPtr, CM )
+import Lucretia.TypeChecker.Monad ( error, freshPtr, tryAny, CM )
 import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming, RenamingType(..) )
 import Lucretia.TypeChecker.Update ( merge, update )
 import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
 
+liftList :: (Monad m) => [a] -> ListT m a
+liftList = ListT . return
 
-bindBlock :: Block -> CM Type
+bindBlock :: Block -> CM Types
 bindBlock ss = bindCsBlock emptyConstraints ss
 
-bindCsBlock :: Constraints -> Block -> CM Type
+bindCsBlock :: Constraints -> Block -> CM Types
 bindCsBlock cs = bindTypeBlock (undefinedId, PrePost emptyConstraints cs)
+--bindCsBlock css = bindTypeBlock [(undefinedId, PrePost emptyConstraints cs) | cs <- css]
+
+-- In all binding functions a following invariant is preserved:
+-- error means that all of the possible typing paths have failed.
 
 -- | Bind Pre- & Post-Constraints 'pp' of a code block B with Type of the next statement x, producing Type of the whole Block including statement x.
 -- B x1
@@ -41,11 +49,14 @@ bindCsBlock cs = bindTypeBlock (undefinedId, PrePost emptyConstraints cs)
 -- B ...
 -- B xN
 --   x
-bindTypeBlock :: Type -> Block -> CM Type -- TODO OPT RTR Ptr to (Maybe Ptr)
-bindTypeBlock t [] = return t
-bindTypeBlock (_, pp) (s:ss) = do
-  sT <- bindStmt pp s
-  bindTypeBlock sT ss
+bindTypeBlock :: Type -> Block -> CM Types -- TODO OPT RTR Ptr to (Maybe Ptr)
+bindTypeBlock t [] = return [t]
+-- bindTypeBlock (_, pp) (s:ss) = do
+--   ts <- bindStmt pp s
+--   concatMap (\t -> bindTypeBlock t ss) ts
+bindTypeBlock (_, pp) (s:ss) = runListT $ do
+  t <- ListT $ bindStmt pp s
+  ListT $ bindTypeBlock t ss
 
 bind :: PrePost -> Type -> CM Type
 bind ppCall (iDecl, ppDecl) = do
@@ -71,7 +82,7 @@ bind ppCall (iDecl, ppDecl) = do
 bindPP :: PrePost -> PrePost -> CM Type
 bindPP ppCall ppDecl = bind ppCall (undefinedId, ppDecl)
 
-bindStmt :: PrePost -> Stmt -> CM Type
+bindStmt :: PrePost -> Stmt -> CM Types
 
 -- Binding statements inside an if statement is handled in a special way. Other statements are handled by matchStmt function.
 -- TODO If can be an expression
@@ -115,8 +126,8 @@ bindStmt pp@(PrePost _ cs) (IfHasAttr x a b1 b2) = do
 
 -- Type produced by compiling all the other statements to PrePost can be bound in the same way.
 bindStmt pp s = do
-  sT <- matchStmt pp s
-  bind pp sT
+  ts <- matchStmt pp s
+  tryAny [bind pp t | t <- ts]
 
 isBool :: IVar -> Ptr -> PrePost
 isBool x xId = PrePost cs cs
@@ -125,8 +136,11 @@ isBool x xId = PrePost cs cs
                           ]
         xToBool = (xId, tOrPrimitive KBool)
 
-mergeTypes :: Constraints -> Type -> Type -> CM Type
-mergeTypes cs (_, pp1) (_, pp2) = do
+mergeTypes :: Constraints -> Types -> Types -> CM Types
+mergeTypes cs ts1 ts2 = tryAny [mergeTypesSingle cs t1 t2 |  t1 <- ts1, t2 <- ts2]
+
+mergeTypesSingle :: Constraints -> Type -> Type -> CM Type
+mergeTypesSingle cs (_, pp1) (_, pp2) = do
   renaming <- getRenamingPP FullRenaming pp1 pp2
   renamingOnlyOnVariablesCreatedInScope cs renaming
   let pp2Renamed = applyRenaming renaming pp2
@@ -138,14 +152,15 @@ mergeTypes cs (_, pp1) (_, pp2) = do
       (freeVariables cs `Set.intersection` freeVariables r == Set.empty)
       `orFail` "Cannot merge type pointers from 'then' and 'else' branches of an 'if' instruction. Cannot merge fresh type pointer (i.e. created in a branch) with a stale type pointer (i.e. created before the branch). Only type pointers freshly created in both branches can be merged (i.e. one created in 'then', the other in 'else')."
 -- All @Ptr@ variables in the returned @Type@ must be fresh, so there is no risk of @Ptr@ name clashes when @'bind'ing@ @Type@ of the current @Stmt@ to the @PrePost@ of the block preceding the @Stmt@.
-matchStmt :: PrePost -> Stmt -> CM Type
+matchStmt :: PrePost -> Stmt -> CM Types
 
 matchStmt pp (Return e) = matchExpFresh pp e
 
 matchStmt pp (SetVar x e) = do
-  (eId, ePP) <- matchExpFresh pp e
-  let setPP = setVar x eId
-  bind ePP (eId, setPP)
+  ts <- matchExpFresh pp e
+  tryAny [let setPP = (setVar x eId) in
+                bind ePP (eId, setPP)
+                | (eId, ePP) <- ts]
 
   --HERE why binding & renaming works? G make sure it works
   -- (eId, ePP) <- matchAndRename
@@ -157,10 +172,11 @@ matchStmt pp (SetVar x e) = do
                 post = Map.fromList [ toSingletonRec env x eId ]
 
 matchStmt pp (SetAttr x a e) = do
-  (eId, ePP) <- matchExpFresh pp e
   xId <- freshPtr
-  let setPP = setAttr x xId a eId
-  bind ePP (eId, setPP)
+  ts <- matchExpFresh pp e
+  tryAny [let setPP = setAttr x xId a eId in
+                bind ePP (eId, setPP)
+                | (eId, ePP) <- ts]
 
   where setAttr x xId a eId = PrePost pre post
           where pre  = Map.fromList [ toSingletonRec env x xId
@@ -172,10 +188,10 @@ matchStmt pp (SetAttr x a e) = do
 
 
 -- | 'match' rules to an @Exp@ producing Type, then rename all @Ptrs@ to fresh variables in that type.
-matchExpFresh :: PrePost -> Exp -> CM Type
+matchExpFresh :: PrePost -> Exp -> CM Types
 matchExpFresh pp e = do
-  t <- matchExp pp e
-  renameToFresh t
+  ts <- matchExp pp e
+  tryAny [renameToFresh t | t <- ts]
 
     where
     renameToFresh :: Type -> CM Type
@@ -194,12 +210,12 @@ matchExpFresh pp e = do
 -- B ...
 -- B eN
 --   e
-matchExp :: PrePost -> Exp -> CM Type
+matchExp :: PrePost -> Exp -> CM Types
 
-matchExp _ (EGetVar a) = return (aId, PrePost constraints constraints)
+matchExp _ (EGetVar a) = return [(aId, PrePost constraints constraints)]
   where constraints = Map.fromList [ toSingletonRec env a aId ]
 
-matchExp _ (EGetAttr x a) = return (aId, PrePost constraints constraints)
+matchExp _ (EGetAttr x a) = return [(aId, PrePost constraints constraints)]
   where constraints = Map.fromList [ toSingletonRec env x xId
                                    , toSingletonRec xId a aId
                                    ]
@@ -214,16 +230,18 @@ matchExp (PrePost _ cs) (EFunCall f xsCall) = do
   -- Pre- & post- constraints must be declared in the code.
   -- In case of other function signatures, InheritedPP should be
   -- replaced in matchExp (EFunDef ...).
-  TFunSingle tsDecl iDecl (DeclaredPP ppDecl) <- getFunType f cs
-  checkArgsLength xsCall tsDecl
-  let ppInherited = inheritPP ppDecl
-      -- Q how it should work
-
-  let ppWithArgs = addArgsPP xsCall tsDecl ppInherited
-  return (iDecl, ppWithArgs)
+  ts <- getFunType f cs
+  tryAny [callSingleFun cs t | t <- ts]
 
     where
-    getFunType :: IVar -> Constraints -> CM TFunSingle
+    callSingleFun :: Constraints -> TFunSingle -> CM Type
+    callSingleFun cs (TFunSingle tsDecl iDecl (DeclaredPP ppDecl)) = do
+      checkArgsLength xsCall tsDecl
+      let ppInherited = inheritPP ppDecl
+      let ppWithArgs = addArgsPP xsCall tsDecl ppInherited
+      return (iDecl, ppWithArgs)
+
+    getFunType :: IVar -> Constraints -> CM TFun
     getFunType f cs =
       case f `lookupInEnv` cs of
         Nothing                      -> error pleaseDefineSignature
@@ -234,7 +252,7 @@ matchExp (PrePost _ cs) (EFunCall f xsCall) = do
            Nothing   -> error pleaseDefineSignature 
         where pleaseDefineSignature = "Please declare signature for the function "++f++". Infering type of a function passed as a parameter to another function (higher order function type inference) is not supported yet."
 
-    unwrapFunFromOr :: TOr -> CM TFunSingle
+    unwrapFunFromOr :: TOr -> CM TFun
     unwrapFunFromOr tOr =
       case Map.toList tOr of
         [(KFun, TFun tfun)] -> return tfun
@@ -250,13 +268,17 @@ matchExp (PrePost _ cs) (EFunCall f xsCall) = do
 -- TODO implement TFunOr
 matchExp _ (EFunDef argNames maybeSignature funBody) = do
   funType <- case maybeSignature of
-    Just signature -> checkSignature signature
-    Nothing        -> inferSignature argNames funBody
-  postPointer $ tOrFromTFunSingle funType
+    []        -> inferSignature argNames funBody
+    signature -> checkSignature signature
+  postPointer $ tOrFromTFun funType
 
   where
-    checkSignature :: TFunSingle -> CM TFunSingle
-    checkSignature decl = do
+    -- All declared signatures must be valid, so we use mapM instead of tryAny.
+    checkSignature :: TFun -> CM TFun
+    checkSignature = mapM checkSingleSignature
+
+    checkSingleSignature :: TFunSingle -> CM TFunSingle
+    checkSingleSignature decl = do
       -- pre- & post- constraints must be declared in the code
       -- that should be checked by Lucretia parser
       -- case maybePPDecl of
@@ -272,17 +294,20 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
       let ppInherited = inheritPP ppDecl
       let argCs = addArgsCs argNames argTypes (_pre ppInherited)
 
-      (iInfered, ppInfered) <- bindCsBlock argCs funBody
-
-      checkEmptyPreEnv ppInfered
-      let ppInferedNoEnv = eraseEnv ppInfered
-
-      checkPre ppInherited ppInferedNoEnv
-      checkPost argTypes iInfered (_post ppInferedNoEnv) iDecl (_post ppInherited)
+      inferedTs <- bindCsBlock argCs funBody
+      tryAny [checkFunConditions argTypes iDecl ppInherited t | t <- inferedTs]
 
       return decl
 
         where
+        checkFunConditions :: [Ptr] -> Ptr -> PrePost -> Type -> CM ()
+        checkFunConditions argTypes iDecl ppInherited (iInfered, ppInfered) = do
+          checkEmptyPreEnv ppInfered
+          let ppInferedNoEnv = eraseEnv ppInfered
+
+          checkPre ppInherited ppInferedNoEnv
+          checkPost argTypes iInfered (_post ppInferedNoEnv) iDecl (_post ppInherited)
+
         -- | Add a prefix "S" to all the type variables so that their names do
         -- not clash with the fresh variables used later on.
         renameToUnique :: TFunSingle -> TFunSingle
@@ -299,32 +324,38 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
                               (iDecl   :argTypes, csDecl   )
                               (iInfered:argTypes, csInfered)
       (iDecl == applyRenaming renaming iInfered)
-        `orFail`
-        ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
-      applyRenaming renaming (traceShowIdHlWith showConstraints csInfered)
-        `checkWeaker`
-        (traceShowIdHlWith showConstraints csDecl)
+        `orFail` ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
+      applyRenaming renaming csInfered `checkWeaker` csDecl
             
 
-    inferSignature :: [IVar] -> Block -> CM TFunSingle
+    inferSignature :: [IVar] -> Block -> CM TFun
     inferSignature argNames funBody = do
-      funType <- bindBlock funBody
+      inferedTs <- bindBlock funBody
 
+      -- When infering a function signature we only allow a situation when all
+      -- function parameters have unique type pointers. Still a programmer can
+      -- declare a function signature where for some two different parameters
+      -- their type pointers are the same.
       let argTypes = fmap (\n -> "A"++n) argNames
       let argCs = addArgsCs argNames argTypes emptyConstraints
 
-      (funReturnId, funBodyPP) <- bind (PrePost emptyConstraints argCs) funType
+      tryAny [checkFunConditions argTypes argCs t | t <- inferedTs]
 
-      checkEmptyPreEnv funBodyPP
-      let funBodyNoEnvPP = eraseEnv funBodyPP
+        where
+        checkFunConditions :: [Ptr] -> Constraints -> Type -> CM TFunSingle
+        checkFunConditions argTypes argCs inferedT = do
+          (funReturnId, funBodyPP) <- bind (PrePost emptyConstraints argCs) inferedT
 
-      -- Here we could clean the post-constraints from the garbage variables
-      -- created inside the function body (they do not add anything to the
-      -- function signature and they only clutter the infered signature) but
-      -- there is no garbage collection for variables defined in the Lucretia
-      -- type system.
+          checkEmptyPreEnv funBodyPP
+          let funBodyNoEnvPP = eraseEnv funBodyPP
 
-      return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
+          -- Here we could clean the post-constraints from the garbage variables
+          -- created inside the function body (they do not add anything to the
+          -- function signature and they only clutter the infered signature) but
+          -- there is no garbage collection for variables defined in the Lucretia
+          -- type system.
+
+          return $ TFunSingle argTypes funReturnId (DeclaredPP funBodyNoEnvPP)
 
     -- | Checks that no variable was referenced, apart from the arguments
     checkEmptyPreEnv :: PrePost -> CM ()
@@ -348,11 +379,11 @@ argsTOr :: [IVar] -> [Ptr] -> TOr
 argsTOr argNames argTypes = tOrFromTRec $ Map.fromList $ zip argNames (requiredList argTypes)
 
 
-postPointerPrimitive :: Kind -> CM Type
+postPointerPrimitive :: Kind -> CM Types
 postPointerPrimitive kind = postPointer $ tOrPrimitive kind
 
-postPointer :: TOr -> CM Type
-postPointer tOr = return (xId, PrePost emptyConstraints (Map.insert xId tOr emptyConstraints))
+postPointer :: TOr -> CM Types
+postPointer tOr = return [(xId, PrePost emptyConstraints (Map.insert xId tOr emptyConstraints))]
 
 required :: Ptr -> TAttr
 required i = (Required i)
@@ -373,6 +404,8 @@ instance InheritPP TOr where
 instance InheritPP TSingle where
   inherit pp (TFun tfun) = TFun $ inherit pp tfun
   inherit pp other = other
+instance InheritPP TFun where
+  inherit pp = fmap (inherit pp)
 instance InheritPP TFunSingle where
   inherit pp (TFunSingle funArgs funRet funPP) = TFunSingle funArgs funRet $ inherit pp funPP
 instance InheritPP FunPrePost where

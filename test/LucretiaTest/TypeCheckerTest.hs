@@ -49,14 +49,14 @@ outputTypeTestsData =
   , ($(nv 'bGetUndefinedAttr), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {a: Y}]")
   , ($(nv 'bGetAttr_noVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: Y}, Y < {a: X}]")
   , ($(nv 'bGetAttr_varNotRec), "Error: Type: int should be weaker (have less possible types) then: {a: Y}")
-  , ($(nv 'bSetAttr_xa), "Y with Constraints: [Env < {x: X}, X < {a: Y}, Y < int]")
-  , ($(nv 'bSetAttr_xab), "A with Constraints: [A < string, Env < {x: X}, X < {a: Y, b: A}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Get_xa), "Y with Constraints: [Env < {x: X}, X < {a: Y}, Y < int]")
-  , ($(nv 'bSetAttr_xab__Get_xb), "A with Constraints: [A < string, Env < {x: X}, X < {a: Y, b: A}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Set_xa_to_yb), "Y with Constraints: [A < {b: Y}, Env < {x: X, y: A}, X < {a: Y}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Get_yb), "Y with Constraints: [A < {b: Y}, Env < {x: X, y: A}, X < {a: Y}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb), "Y with Constraints: [A < {b: Y}, E < string, Env < {x: X, y: A}, X < {a: E}, Y < int]")
-  , ($(nv 'bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya), "Z with Constraints: [Env < {x: X, y: X}, X < {a: Z}, Z < int]")
+  , ($(nv 'bSetAttr_xa), "Z with Constraints: [Env < {x: X}, X < {a: Z}, Z < int]")
+  , ($(nv 'bSetAttr_xab), "B with Constraints: [B < string, Env < {x: X}, X < {a: Z, b: B}, Z < int]")
+  , ($(nv 'bSetAttr_xa__Get_xa), "Z with Constraints: [Env < {x: X}, X < {a: Z}, Z < int]")
+  , ($(nv 'bSetAttr_xab__Get_xb), "B with Constraints: [B < string, Env < {x: X}, X < {a: Z, b: B}, Z < int]")
+  , ($(nv 'bSetAttr_xa__Set_xa_to_yb), "Z with Constraints: [A < {b: Z}, Env < {x: X, y: A}, X < {a: Z}, Z < int]")
+  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Get_yb), "Z with Constraints: [A < {b: Z}, Env < {x: X, y: A}, X < {a: Z}, Z < int]")
+  , ($(nv 'bSetAttr_xa__Set_xa_to_yb__Set_xa__Get_yb), "Z with Constraints: [A < {b: Z}, Env < {x: X, y: A}, F < string, X < {a: F}, Z < int]")
+  , ($(nv 'bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya), "A with Constraints: [A < int, Env < {x: X, y: X}, X < {a: A}]")
   , ($(nv 'bFun_identity), "Z with Constraints: [Env < {identity: Z}, Z < func (Y) [] -> Y []]")
   , ($(nv 'bFun_identitySetFields), "F with Constraints: [Env < {identitySetFields: F}, F < func (C, D, E) [C < {}] -> C [C < {a: D, b: E}]]")
   , ($(nv 'bFun_withSignature_identity), "Z with Constraints: [Env < {identity: Z}, Z < func (Y) [] -> Y []]")
@@ -72,10 +72,10 @@ outputTypeTestsData =
   , ($(nv 'bCall_recursive), "C with Constraints: [B < func (B) [B < func (B)  -> C ] -> C [B < func (B)  -> C , C < int], C < int, Env < {f: B}]")
   , ($(nv 'bFun_recursive_withParams), "B with Constraints: [B < func (Z, A) [Z < func (Z, A)  -> A ] -> A [A < int, Z < func (Z, A)  -> A ], Env < {f: B}]")
   , ($(nv 'bCall_recursive_withParams), "C with Constraints: [B < func (B, C) [B < func (B, C)  -> C ] -> C [B < func (B, C)  -> C , C < int], C < int, Env < {f: B, i: C}]")
-  , ($(nv 'bIf_doubleObjectCreation), "H with Constraints: [Env < {f: H}, H < func (E) [E < bool] -> F [E < bool, F < {z: G}, G < {}]]")
+  , ($(nv 'bIf_doubleObjectCreation), "H with Constraints: [Env < {f: H}, H < func (F) [F < bool] -> G [E < {}, F < bool, G < {z: E}]]")
   , ($(nv 'bIf_mergeOfPreviouslyCreatedObjects), "Error: There are multiple variables that should be renamed to Y. Error occured while tried to get renaming from: [A < bool, Env < {cond: A, env: X, x: Y, y: Z}, X < {z: Z}, Y < {}, Z < {}] to: [A < bool, Env < {cond: A, env: X, x: Y, y: Z}, X < {z: Y}, Y < {}, Z < {}]")
-  , ($(nv 'bIf_attrUndefinedInThen), "F with Constraints: [Env < {f: F}, F < func (C) [C < bool] -> D [C < bool, D < {optional z: E}, E < {}]]")
-  , ($(nv 'bIf_attrUndefinedInElse), "F with Constraints: [Env < {f: F}, F < func (C) [C < bool] -> D [C < bool, D < {optional z: E}, E < {}]]")
+  , ($(nv 'bIf_attrUndefinedInThen), "F with Constraints: [Env < {f: F}, F < func (D) [D < bool] -> E [C < {}, D < bool, E < {optional z: C}]]")
+  , ($(nv 'bIf_attrUndefinedInElse), "F with Constraints: [Env < {f: F}, F < func (D) [D < bool] -> E [C < {}, D < bool, E < {optional z: C}]]")
   , ($(nv 'bIf_varUndefinedInThen), "undefinedId with Constraints: [Env < {cond: X, optional x: Z}, X < bool, Z < {}]")
   , ($(nv 'bIf_varUndefinedInThen_returnVar), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_preConstraints), "J with Constraints: [Env < {f: J}, J < func (F, G) [F < bool, G < {a: H}] -> I [E < int, F < bool, G < {a: H}]]")
@@ -91,13 +91,20 @@ outputTypeTestsData =
   , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "J with Constraints: [Env < {f: F, xx: G}, F < func (C) [] -> E [D < bool, E < {}], G < {}, I < bool, J < {}]")
   , ($(nv 'bIf_reassignInOneBranchWithTheSameVar_inFunction), "E with Constraints: [D < func (B) [] -> B [C < bool], E < {}, Env < {f: D, xx: E}, G < bool]")
   , ($(nv 'bIfHasAttr_attributeUndefined), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {optional a: Z}]")
-  , ($(nv 'bIfHasAttr_attributeDefined), "undefinedId with Constraints: [Env < {x: X}, X < {optional a: Y}, Y < int]")
-  , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInThen), "undefinedId with Constraints: [A < int, Env < {cond: Y, x: X}, X < {optional a: A, optional b: A}, Y < bool]")
+  , ($(nv 'bIfHasAttr_attributeDefined), "undefinedId with Constraints: [Env < {x: X}, X < {optional a: Z}, Z < int]")
+  , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInThen), "undefinedId with Constraints: [B < int, Env < {cond: Y, x: X}, X < {optional a: B, optional b: B}, Y < bool]")
   , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInElse), "Error: Attribute is required but it was not defined.")
   , ($(nv 'bFun_withSignature_intersectionExample_firstSignature), "F with Constraints: [Env < {f: F}, F < func (D, E) [D < {}, E < {a: C}] -> C [B < int, D < {a: B}, E < {a: C}]]")
-  , ($(nv 'bCall_withSignature_intersectionExample_firstSignature), "I with Constraints: [Env < {f: F, xx: G, yy: H}, F < func (D, E) [D < {}, E < {a: C}] -> C [B < int, D < {a: B}, E < {a: C}], G < {a: K}, H < {a: I}, I < bool, K < int]")
+  , ($(nv 'bCall_withSignature_intersectionExample_firstSignature), "J with Constraints: [Env < {f: F, xx: G, yy: H}, F < func (D, E) [D < {}, E < {a: C}] -> C [B < int, D < {a: B}, E < {a: C}], G < {a: K}, H < {a: J}, J < bool, K < int]")
   , ($(nv 'bFun_withSignature_intersectionExample_secondSignature), "D with Constraints: [D < func (C, C) [C < {}] -> B [B < int, C < {a: B}], Env < {f: D}]")
   , ($(nv 'bCall_withSignature_intersectionExample_secondSignature), "F with Constraints: [D < func (C, C) [C < {}] -> B [B < int, C < {a: B}], E < {a: F}, Env < {f: D, xx: E}, F < int]")
+  , ($(nv 'bFun_withTwoSignatures_intersectionExample), "J with Constraints: [Env < {f: J}, J < func (H, I) [H < {}, I < {a: G}] -> G [F < int, H < {a: F}, I < {a: G}] and (H, H) [H < {}] -> F [F < int, H < {a: F}]]")
+  , ($(nv 'bCall_withTwoSignatures_intersectionExample_firstSignature), "N with Constraints: [Env < {f: J, xx: K, yy: L}, J < func (H, I) [H < {}, I < {a: G}] -> G [F < int, H < {a: F}, I < {a: G}] and (H, H) [H < {}] -> F [F < int, H < {a: F}], K < {a: O}, L < {a: N}, N < bool, O < int]")
+  , ($(nv 'bCall_withTwoSignatures_intersectionExample_secondSignature), "P with Constraints: [Env < {f: J, xx: K}, J < func (H, I) [H < {}, I < {a: G}] -> G [F < int, H < {a: F}, I < {a: G}] and (H, H) [H < {}] -> F [F < int, H < {a: F}], K < {a: P}, P < int]")
+  , ($(nv 'bCall_withTwoSignatures_intersectionExample_secondSignature_badArgs), "Error: No typing path has succeeded: [\"Type: int should be weaker (have less possible types) then: {a: M}\",\"Type: int should be weaker (have less possible types) then: {}\"]")
+  , ($(nv 'bFun_withTwoSignatures_tooStrongPre), "Error: Constraints: [] should be weaker or equal to [SX < {a: X}]")
+
+  , ($(nv 'bFun_withTwoSignatures_bothGood), "G with Constraints: [Env < {f: F, xx: G}, F < func (E) [E < {}] -> E [E < {}] and (E) [E < {}] -> E [D < int, E < {a: D}], G < {}] AND G with Constraints: [Env < {f: F, xx: G}, F < func (E) [E < {}] -> E [E < {}] and (E) [E < {}] -> E [D < int, E < {a: D}], G < {a: I}, I < int]")
   -- , ($(nv '), "C")
   ]
 
@@ -186,13 +193,13 @@ bSetAttr_xa__Set_x_to_y__Set_xa__Get_ya =
   ]
 bFun_identity =
   [ SetVar "identity" $
-      EFunDef ["x"] Nothing $
+      EFunDef ["x"] [] $
       [ Return $ EGetVar "x"
       ]
   ]
 bFun_identitySetFields =
   [ SetVar "identitySetFields" $
-      EFunDef ["r", "x", "y"] Nothing $
+      EFunDef ["r", "x", "y"] [] $
       [ SetAttr "r" "a" $ EGetVar "x"
       , SetAttr "r" "b" $ EGetVar "y"
       , Return $ EGetVar "r"
@@ -201,14 +208,14 @@ bFun_identitySetFields =
 bFun_withSignature_identity =
   [ SetVar "identity" $
       EFunDef ["x"]
-      (Just $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty))
+      [ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty)]
       [ Return $ EGetVar "x"
       ]
   ]
 bFun_withSignature_identitySetFields =
   [ SetVar "identitySetFields" $
       EFunDef ["r", "x", "y"]
-      (Just $ TFunSingle ["R", "X", "Y"] "R"
+      [ TFunSingle ["R", "X", "Y"] "R"
         (DeclaredPP $ PrePost
           (Map.fromList [ ("R", tOrEmptyRec)
                         ])
@@ -217,7 +224,7 @@ bFun_withSignature_identitySetFields =
                                                            ])
                         ])
         )
-      )
+      ]
       [ SetAttr "r" "a" $ EGetVar "x"
       , SetAttr "r" "b" $ EGetVar "y"
       , Return $ EGetVar "r"
@@ -226,33 +233,33 @@ bFun_withSignature_identitySetFields =
 bFun_withSignature_tooStrongPre =
   [ SetVar "f" $
       EFunDef ["x"]
-      (Just $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty))
+      [ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty)]
       [ Return $ EGetAttr "x" "a"
       ]
   ]
 bFun_withSignature_tooStrongPost =
   [ SetVar "identity" $
       EFunDef ["x"]
-      (Just $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty (Map.singleton "X" $ tOrSingletonRec "a" "Y")))
+      [ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty (Map.singleton "X" $ tOrSingletonRec "a" "Y"))]
       [ Return $ EGetVar "x"
       ]
   ]
 bFun_identityNested =
   [ SetVar "identityNested" $
       EFunDef ["x", "identity"]
-      Nothing
+      []
       [ Return $ EFunCall "identity" ["x"]
       ]
   ]
 bFun_withSignature_identityNested =
   [ SetVar "identityNested" $
       EFunDef ["x", "identity"]
-      (Just $ TFunSingle ["X", "Identity"] "X"
+      [ TFunSingle ["X", "Identity"] "X"
         (DeclaredPP $ PrePost
           (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty)) ])
           (Map.fromList [ ("Identity", tOrFromTFunSingle $ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty)) ])
         )
-      )
+      ]
       [ Return $ EFunCall "identity" ["x"]
       ]
   ]
@@ -283,9 +290,9 @@ postRecursive = Map.fromList
   ]
 bFun_recursive =
   [ SetVar "f" $ EFunDef ["f"]
-    (Just $ TFunSingle ["F"] "I"
+    [ TFunSingle ["F"] "I"
       (DeclaredPP $ PrePost preRecursive postRecursive)
-    )
+    ]
     [ Return $ EFunCall "f" ["f"]
     ]
   ]
@@ -302,9 +309,9 @@ postRecursive_withParams = Map.fromList
   ]
 bFun_recursive_withParams =
   [ SetVar "f" $ EFunDef ["f", "i"]
-    (Just $ TFunSingle ["F", "I"] "I"
+    [ TFunSingle ["F", "I"] "I"
       (DeclaredPP $ PrePost preRecursive_withParams postRecursive_withParams)
-    )
+    ]
     [ Return $ EFunCall "f" ["f", "i"]
     ]
   ]
@@ -314,7 +321,7 @@ bCall_recursive_withParams =
   , Return $ EFunCall "f" ["f", "i"]
   ]
 bIf_doubleObjectCreation =
-  [ SetVar "f" $ EFunDef ["cond"] Nothing
+  [ SetVar "f" $ EFunDef ["cond"] []
     [ SetVar "env" ENew
     , If "cond"
       -- then
@@ -325,7 +332,7 @@ bIf_doubleObjectCreation =
     ]
   ]
 bIf_mergeOfPreviouslyCreatedObjects =
-  [ SetVar "f" $ EFunDef ["cond"] Nothing
+  [ SetVar "f" $ EFunDef ["cond"] []
     [ SetVar "env" ENew
     , SetVar "x"   ENew
     , SetVar "y"   ENew
@@ -338,7 +345,7 @@ bIf_mergeOfPreviouslyCreatedObjects =
     ]
   ]
 bIf_attrUndefinedInThen =
-  [ SetVar "f" $ EFunDef ["cond"] Nothing
+  [ SetVar "f" $ EFunDef ["cond"] []
     [ SetVar "env" ENew
     , If "cond"
       -- then
@@ -349,7 +356,7 @@ bIf_attrUndefinedInThen =
     ]
   ]
 bIf_attrUndefinedInElse =
-  [ SetVar "f" $ EFunDef ["cond"] Nothing
+  [ SetVar "f" $ EFunDef ["cond"] []
     [ SetVar "env" ENew
     , If "cond"
       -- then
@@ -372,7 +379,7 @@ bIf_varUndefinedInThen_returnVar =
   [ Return $ EGetVar "x"
   ]
 bIf_varUndefinedInElse =
-  [ SetVar "f" $ EFunDef ["cond"] Nothing
+  [ SetVar "f" $ EFunDef ["cond"] []
     [ SetVar "env" ENew
     , If "cond"
       -- then
@@ -383,7 +390,7 @@ bIf_varUndefinedInElse =
     ]
   ]
 bIf_preConstraints =
-  [ SetVar "f" $ EFunDef ["cond", "x"] Nothing
+  [ SetVar "f" $ EFunDef ["cond", "x"] []
     [ If "cond"
       -- then
       [ Return $ EGetAttr "x" "a"
@@ -396,7 +403,7 @@ bIf_preConstraints =
     ]
   ]
 bIf_varDefinedInBoth_inFunction =
-  [ SetVar "f" $ EFunDef ["cond", "y"] Nothing
+  [ SetVar "f" $ EFunDef ["cond", "y"] []
     [ If "cond"
       -- then
       [ SetVar "x" ENew ]
@@ -406,12 +413,12 @@ bIf_varDefinedInBoth_inFunction =
     ]
   ]
 bGetUndefinedVar_inFunction =
-  [ SetVar "f" $ EFunDef [] Nothing
+  [ SetVar "f" $ EFunDef [] []
     [ Return $ EGetVar "x"
     ]
   ]
 bIf_varUndefinedInThen_inFunction =
-  [ SetVar "f" $ EFunDef ["cond", "y"] Nothing
+  [ SetVar "f" $ EFunDef ["cond", "y"] []
     [ If "cond"
       -- then
       [ ]
@@ -446,7 +453,7 @@ bIf_reassignInOneBranchWithTheSameVar =
   , Return $ EGetVar "x"
   ]
 bIf_reassignInOneBranchWithNew_inFunction =
-  [ SetVar "f" $ EFunDef ["x"] Nothing
+  [ SetVar "f" $ EFunDef ["x"] []
     [ SetVar "cond" (EBool True)
     , If "cond" [ ] [ SetVar "x" ENew ]
     , Return $ EGetVar "x"
@@ -455,7 +462,7 @@ bIf_reassignInOneBranchWithNew_inFunction =
   , Return $ EFunCall "f" ["xx"]
   ]
 bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction =
-  [ SetVar "f" $ EFunDef ["x"] Nothing
+  [ SetVar "f" $ EFunDef ["x"] []
     [ SetVar "cond" (EBool True)
     , SetVar "y" ENew
     , If "cond" [ ] [ SetVar "x" $ EGetVar "y" ]
@@ -465,7 +472,7 @@ bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction =
   , Return $ EFunCall "f" ["xx"]
   ]
 bIf_reassignInBothBranchesWithNew_inFunction =
-  [ SetVar "f" $ EFunDef ["x"] Nothing
+  [ SetVar "f" $ EFunDef ["x"] []
     [ SetVar "cond" (EBool True)
     , If "cond" [ SetVar "x" ENew ] [ SetVar "x" ENew ]
     , Return $ EGetVar "x"
@@ -474,7 +481,7 @@ bIf_reassignInBothBranchesWithNew_inFunction =
   , Return $ EFunCall "f" ["xx"]
   ]
 bIf_reassignInOneBranchWithTheSameVar_inFunction =
-  [ SetVar "f" $ EFunDef ["x"] Nothing
+  [ SetVar "f" $ EFunDef ["x"] []
     [ SetVar "cond" (EBool True)
     , If "cond" [ ] [ SetVar "x" $ EGetVar "x" ]
     , Return $ EGetVar "x"
@@ -533,7 +540,7 @@ bFun_withSignature_intersectionExample_firstSignature =
   [ SetVar "f" $
       EFunDef ["x", "y"]
       -- func (X, Y) [X < {}, Y < {a: U}] -> U [X < {a: I}, Y < {a: U}, I < int]
-      (Just $ TFunSingle ["X", "Y"] "U"
+      [ TFunSingle ["X", "Y"] "U"
         (DeclaredPP $ PrePost
           (Map.fromList [ ("X", tOrEmptyRec)
                         , ("Y", tOrFromTRec $ Map.fromList [ ("a", (Required "U")) ])
@@ -543,7 +550,7 @@ bFun_withSignature_intersectionExample_firstSignature =
                         , ("Y", tOrFromTRec $ Map.fromList [ ("a", (Required "U")) ])
                         ])
         )
-      )
+      ]
       [ SetAttr "x" "a" cInt
       , Return $ EGetAttr "y" "a"
       ]
@@ -559,7 +566,7 @@ bFun_withSignature_intersectionExample_secondSignature =
   [ SetVar "f" $
       EFunDef ["x", "y"]
       -- func (X, X) [X < {}] -> I [I < int, X < {a: I}]
-      (Just $ TFunSingle ["X", "X"] "I"
+      [ TFunSingle ["X", "X"] "I"
         (DeclaredPP $ PrePost
           (Map.fromList [ ("X", tOrEmptyRec)
                         ])
@@ -567,7 +574,7 @@ bFun_withSignature_intersectionExample_secondSignature =
                         , ("I", tOrPrimitive KInt)
                         ])
         )
-      )
+      ]
       [ SetAttr "x" "a" cInt
       , Return $ EGetAttr "y" "a"
       ]
@@ -576,5 +583,76 @@ bCall_withSignature_intersectionExample_secondSignature =
   bFun_withSignature_intersectionExample_secondSignature ++
   [ SetVar "xx" ENew
   , Return $ EFunCall "f" ["xx", "xx"]
+  ]
+bFun_withTwoSignatures_intersectionExample =
+  [ SetVar "f" $
+      EFunDef ["x", "y"]
+      -- func (X, Y) [X < {}, Y < {a: U}] -> U [X < {a: I}, Y < {a: U}, I < int]
+      [ TFunSingle ["X", "Y"] "U"
+        (DeclaredPP $ PrePost
+          (Map.fromList [ ("X", tOrEmptyRec)
+                        , ("Y", tOrFromTRec $ Map.fromList [ ("a", (Required "U")) ])
+                        ])
+          (Map.fromList [ ("X", tOrFromTRec $ Map.fromList [ ("a", (Required "I")) ])
+                        , ("I", tOrPrimitive KInt)
+                        , ("Y", tOrFromTRec $ Map.fromList [ ("a", (Required "U")) ])
+                        ])
+        )
+      , TFunSingle ["X", "X"] "I"
+        (DeclaredPP $ PrePost
+          (Map.fromList [ ("X", tOrEmptyRec)
+                        ])
+          (Map.fromList [ ("X", tOrFromTRec $ Map.fromList [ ("a", (Required "I")) ])
+                        , ("I", tOrPrimitive KInt)
+                        ])
+        )
+      ]
+      [ SetAttr "x" "a" cInt
+      , Return $ EGetAttr "y" "a"
+      ]
+  ]
+bCall_withTwoSignatures_intersectionExample_firstSignature =
+  bFun_withTwoSignatures_intersectionExample ++
+  [ SetVar "xx" ENew
+  , SetVar "yy" ENew
+  , SetAttr "yy" "a" (EBool True)
+  , Return $ EFunCall "f" ["xx", "yy"]
+  ]
+bCall_withTwoSignatures_intersectionExample_secondSignature =
+  bFun_withTwoSignatures_intersectionExample ++
+  [ SetVar "xx" ENew
+  , Return $ EFunCall "f" ["xx", "xx"]
+  ]
+bCall_withTwoSignatures_intersectionExample_secondSignature_badArgs =
+  bFun_withTwoSignatures_intersectionExample ++
+  [ SetVar "xx" cInt
+  , Return $ EFunCall "f" ["xx", "xx"]
+  ]
+bFun_withTwoSignatures_tooStrongPre =
+  [ SetVar "f" $
+      EFunDef ["x"]
+      [ TFunSingle ["X"] "X" (DeclaredPP $ PrePost Map.empty Map.empty)
+      , TFunSingle ["X"] "X" (DeclaredPP $ PrePost
+                                        (Map.singleton "X" (tOrEmptyRec))
+                                        (Map.singleton "X" (tOrEmptyRec)))
+      ]
+      [ Return $ EGetAttr "x" "a"
+      ]
+  ]
+csEmptyRec       = (Map.singleton "X" tOrEmptyRec)
+csRecWithOneAttr = (Map.fromList [ ("X", (tOrSingletonRec "a" "I"))
+                                 , ("I", (tOrPrimitive KInt))
+                                 ])
+bFun_withTwoSignatures_bothGood =
+  [ SetVar "f" $
+      EFunDef ["x"]
+      [ TFunSingle ["X"] "X" (DeclaredPP $ PrePost csEmptyRec csEmptyRec)
+      , TFunSingle ["X"] "X" (DeclaredPP $ PrePost csEmptyRec csRecWithOneAttr)
+      ]
+      [ SetAttr "x" "a" cInt
+      , Return $ EGetVar "x"
+      ]
+  , SetVar "xx" ENew
+  , Return $ EFunCall "f" ["xx"]
   ]
 

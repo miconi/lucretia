@@ -14,23 +14,24 @@ import Lucretia.Language.Definitions
 import Lucretia.Language.Syntax
 import Lucretia.Language.Types
 
-import Lucretia.TypeChecker.Monad ( CM, evalCM, initState )
+import Lucretia.TypeChecker.Monad ( evalCM, initState, tryAny, CM )
 import Lucretia.TypeChecker.Rules ( bindBlock )
 
 
 typeProgramme :: Block -> ProgrammeType
 typeProgramme b = evalCM (typeProgrammeM b)
 
-typeProgrammeM :: Block -> CM (Ptr, Constraints)
+typeProgrammeM :: Block -> CM [(Ptr, Constraints)]
 typeProgrammeM b = do
-  (id, PrePost pre post) <- bindBlock b
-  expectEmptyPreconditionsIn pre
-  return (id, post)
+  ts <- bindBlock b
+  tryAny [expectEmptyPreconditionsInPre t | t <- ts]
 
-    where expectEmptyPreconditionsIn pre =
-            (pre == emptyConstraints) `orFail` ("Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: " ++ showConstraints pre)
+    where
+    expectEmptyPreconditionsInPre (id, PrePost pre post) = do
+      (pre == emptyConstraints) `orFail` ("Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: " ++ showConstraints pre)
+      return (id, post)
 
 -- | Function for testing purposes, gets Pre- & Post-Constraints for a given block
-typeBlock :: Block -> Either ErrorMsg Type
-typeBlock b = evalCM $ bindBlock b
+typeBlock :: Block -> Either ErrorMsg Types
+typeBlock = evalCM . bindBlock
 
