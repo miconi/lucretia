@@ -123,20 +123,26 @@ ifHasAttrBoth pp@(PrePost _ cs) x a b1 b2 = do
 
   where 
   thenStarter :: IVar -> Ptr -> IAttr -> Ptr -> PrePost
-  thenStarter x xId a aId = PrePost (preStarter x xId a aId) $
-    Map.fromList [ toSingletonRec env x xId
-                 , (xId, tOrFromTRec $ Map.singleton a (Required aId))
-                 ]
+  thenStarter x xId a aId = PrePost (starterOptional  x xId a aId)
+                                    (starterRequired  x xId a aId)
   elseStarter :: IVar -> Ptr -> IAttr -> Ptr -> PrePost
-  elseStarter x xId a aId = PrePost (preStarter x xId a aId) $
-    Map.fromList [ toSingletonRec env x xId
-                 , (xId, tOrFromTRec $ Map.singleton a  Forbidden    )
-                 ]
-  preStarter :: IVar -> Ptr -> IAttr -> Ptr -> Constraints
-  preStarter x xId a aId =
-    Map.fromList [ toSingletonRec env x xId
-                 , (xId, tOrFromTRec $ Map.singleton a (Optional aId))
-                 ]
+  elseStarter x xId a aId = PrePost (starterOptional  x xId a aId)
+                                    (starterForbidden x xId a aId)
+
+starterRequired, starterOptional, starterForbidden :: IVar -> Ptr -> IAttr -> Ptr -> Constraints
+
+starterOptional  x xId a aId =
+  Map.fromList [ toSingletonRec env x xId
+               , (xId, tOrFromTRec $ Map.singleton a (Optional aId))
+               ]
+starterRequired  x xId a aId =
+  Map.fromList [ toSingletonRec env x xId
+               , (xId, tOrFromTRec $ Map.singleton a (Required aId))
+               ]
+starterForbidden x xId a aId =
+  Map.fromList [ toSingletonRec env x xId
+               , (xId, tOrFromTRec $ Map.singleton a  Forbidden    )
+               ]
 
 ifHasAttrPlus pp@(PrePost _ cs) x a b = do
   xId <- freshPtr
@@ -146,12 +152,8 @@ ifHasAttrPlus pp@(PrePost _ cs) x a b = do
 
   where 
   starter :: IVar -> Ptr -> IAttr -> Ptr -> PrePost
-  starter x xId a aId = PrePost starterCs starterCs
-    where
-    starterCs =
-      Map.fromList [ toSingletonRec env x xId
-                   , (xId, tOrFromTRec $ Map.singleton a (Required aId))
-                   ]
+  starter x xId a aId = PrePost (starterRequired  x xId a aId)
+                                (starterRequired  x xId a aId)
 
 isBool :: IVar -> Ptr -> PrePost
 isBool x xId = PrePost cs cs
