@@ -95,7 +95,21 @@ bindStmt pp (If x b1 b2) = do
 
   mergeTypes cs t1 t2
 
-bindStmt pp@(PrePost _ cs) (IfHasAttr x a b1 b2) = do
+bindStmt pp@(PrePost _ cs) (IfHasAttr x a b1 b2) = fmap concat $
+  tryAny [ ifHasAttrBoth  pp x a b1 b2
+         , ifHasAttrPlus  pp x a b1
+       --, ifHasAttrMinus pp x a    b2
+         ]
+
+-- Type produced by compiling all the other statements to PrePost can be bound in the same way.
+bindStmt pp s = do
+  ts <- matchStmt pp s
+  tryAny [bind pp t | t <- ts]
+
+ifHasAttrBoth :: PrePost -> IVar -> IAttr -> Block -> Block -> CM Types
+ifHasAttrPlus :: PrePost -> IVar -> IAttr -> Block -> CM Types
+
+ifHasAttrBoth pp@(PrePost _ cs) x a b1 b2 = do
   xId <- freshPtr
   aId <- freshPtr
 
@@ -124,10 +138,20 @@ bindStmt pp@(PrePost _ cs) (IfHasAttr x a b1 b2) = do
                  , (xId, tOrFromTRec $ Map.singleton a (Optional aId))
                  ]
 
--- Type produced by compiling all the other statements to PrePost can be bound in the same way.
-bindStmt pp s = do
-  ts <- matchStmt pp s
-  tryAny [bind pp t | t <- ts]
+ifHasAttrPlus pp@(PrePost _ cs) x a b = do
+  xId <- freshPtr
+  aId <- freshPtr
+  t   <- bindPP pp (starter x xId a aId)
+  bindTypeBlock t b
+
+  where 
+  starter :: IVar -> Ptr -> IAttr -> Ptr -> PrePost
+  starter x xId a aId = PrePost starterCs starterCs
+    where
+    starterCs =
+      Map.fromList [ toSingletonRec env x xId
+                   , (xId, tOrFromTRec $ Map.singleton a (Required aId))
+                   ]
 
 isBool :: IVar -> Ptr -> PrePost
 isBool x xId = PrePost cs cs
