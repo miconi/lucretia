@@ -90,10 +90,11 @@ outputTypeTestsData =
   , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "J with Constraints: [Env < {f: F, xx: G}, F < func (C) [] -> E [D < bool, E < {}], G < {}, I < bool, J < {}]")
   , ($(nv 'bIf_reassignInOneBranchWithTheSameVar_inFunction), "E with Constraints: [D < func (B) [] -> B [C < bool], E < {}, Env < {f: D, xx: E}, G < bool]")
-  , ($(nv 'bIfHasAttr_attributeUndefined), "Error: No typing path has succeeded: [\"Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {optional a: Z}]\",\"Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {a: B}]\"]")
+  , ($(nv 'bIfHasAttr_attributeUndefined), "undefinedId with Constraints: [Env < {x: X}, X < {forbidden a}]")
+  , ($(nv 'bIfHasAttr_attributeUndefined_setAttrInElse), "H with Constraints: [Env < {x: X}, H < int, X < {forbidden a, b: H}]")
   , ($(nv 'bIfHasAttr_attributeDefined), "undefinedId with Constraints: [Env < {x: X}, X < {optional a: Z}, Z < int] AND undefinedId with Constraints: [Env < {x: X}, X < {a: Z}, Z < int]")
   , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInThen), "undefinedId with Constraints: [B < int, Env < {cond: Y, x: X}, X < {optional a: B, optional b: B}, Y < bool]")
-  , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInElse), "Error: No typing path has succeeded: [\"Attribute is required but it was not defined.\",\"Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).\"]")
+  , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInElse), "Error: No typing path has succeeded: [\"Attribute is required but it was not defined.\",\"Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).\",\"Attribute is forbidden but it may have been defined.\"]")
   , ($(nv 'bFun_withSignature_intersectionExample_firstSignature), "F with Constraints: [Env < {f: F}, F < func (D, E) [D < {}, E < {a: C}] -> C [B < int, D < {a: B}, E < {a: C}]]")
   , ($(nv 'bCall_withSignature_intersectionExample_firstSignature), "J with Constraints: [Env < {f: F, xx: G, yy: H}, F < func (D, E) [D < {}, E < {a: C}] -> C [B < int, D < {a: B}, E < {a: C}], G < {a: K}, H < {a: J}, J < bool, K < int]")
   , ($(nv 'bFun_withSignature_intersectionExample_secondSignature), "D with Constraints: [D < func (C, C) [C < {}] -> B [B < int, C < {a: B}], Env < {f: D}]")
@@ -103,7 +104,6 @@ outputTypeTestsData =
   , ($(nv 'bCall_withTwoSignatures_intersectionExample_secondSignature), "P with Constraints: [Env < {f: J, xx: K}, J < func (H, I) [H < {}, I < {a: G}] -> G [F < int, H < {a: F}, I < {a: G}] and (H, H) [H < {}] -> F [F < int, H < {a: F}], K < {a: P}, P < int]")
   , ($(nv 'bCall_withTwoSignatures_intersectionExample_secondSignature_badArgs), "Error: No typing path has succeeded: [\"Type: int should be weaker (have less possible types) then: {a: M}\",\"Type: int should be weaker (have less possible types) then: {}\"]")
   , ($(nv 'bFun_withTwoSignatures_tooStrongPre), "Error: Constraints: [] should be weaker or equal to [SX < {a: X}]")
-
   , ($(nv 'bFun_withTwoSignatures_bothGood), "G with Constraints: [Env < {f: F, xx: G}, F < func (E) [E < {}] -> E [E < {}] and (E) [E < {}] -> E [D < int, E < {a: D}], G < {}] AND G with Constraints: [Env < {f: F, xx: G}, F < func (E) [E < {}] -> E [E < {}] and (E) [E < {}] -> E [D < int, E < {a: D}], G < {a: I}, I < int]")
   -- , ($(nv '), "C")
   ]
@@ -492,6 +492,11 @@ bIf_reassignInOneBranchWithTheSameVar_inFunction =
 bIfHasAttr_attributeUndefined =
   [ SetVar "x" ENew
   , IfHasAttr "x" "a" [ ] [ ]
+  ]
+bIfHasAttr_attributeUndefined_setAttrInElse =
+  [ SetVar "x" ENew
+  , IfHasAttr "x" "a" [ ] [ SetAttr "x" "b" cInt ]
+  , Return $ EGetAttr "x" "b"
   ]
 bIfHasAttr_attributeDefined =
   -- x = new

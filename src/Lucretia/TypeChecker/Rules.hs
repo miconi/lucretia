@@ -51,19 +51,17 @@ bindCsBlock cs = bindTypeBlock (undefinedId, PrePost emptyConstraints cs)
 --   x
 bindTypeBlock :: Type -> Block -> CM Types -- TODO OPT RTR Ptr to (Maybe Ptr)
 bindTypeBlock t [] = return [t]
--- bindTypeBlock (_, pp) (s:ss) = do
---   ts <- bindStmt pp s
---   concatMap (\t -> bindTypeBlock t ss) ts
-bindTypeBlock (_, pp) (s:ss) = runListT $ do
-  t <- ListT $ bindStmt pp s
-  ListT $ bindTypeBlock t ss
+bindTypeBlock (_, pp) (s:ss) = do
+  ts <- bindStmt pp s
+  fmap concat $ tryAny [bindTypeBlock t ss | t <- ts]
 
 bind :: PrePost -> Type -> CM Type
 bind ppCall (iDecl, ppDecl) = do
-  renaming      <- getRenamingOnEnv (BindRenaming $ freshVariables ppCall) (_post ppCall) (_pre ppDecl)
+  let fresh      = freshPtrs ppCall
+  renaming      <- getRenamingOnEnv (BindRenaming fresh) (_post ppCall) (_pre ppDecl)
   let ppRenamed  = applyRenaming renaming ppDecl
 
-  toWeaken      <- _post ppCall `weaker` _pre ppRenamed
+  toWeaken      <- weaker fresh (_post ppCall) (_pre ppRenamed)
   -- Using Monotonicity (Principle 1 in paper) here:
   preMerged     <- toWeaken `update` _pre ppCall
   -- Q why not:    toWeaken `update` _post ppCall
@@ -76,8 +74,8 @@ bind ppCall (iDecl, ppDecl) = do
          )
 
   where
-  freshVariables :: PrePost -> Set Ptr
-  freshVariables pp = (Set.difference `on` freeVariables) (_post pp) (_pre pp)
+  freshPtrs :: PrePost -> Set Ptr
+  freshPtrs pp = (Set.difference `on` freeVariables) (_post pp) (_pre pp)
 
 bindPP :: PrePost -> PrePost -> CM Type
 bindPP ppCall ppDecl = bind ppCall (undefinedId, ppDecl)
@@ -98,7 +96,7 @@ bindStmt pp (If x b1 b2) = do
 bindStmt pp@(PrePost _ cs) (IfHasAttr x a b1 b2) = fmap concat $
   tryAny [ ifHasAttrBoth  pp x a b1 b2
          , ifHasAttrPlus  pp x a b1
-       --, ifHasAttrMinus pp x a    b2
+         , ifHasAttrMinus pp x a    b2
          ]
 
 -- Type produced by compiling all the other statements to PrePost can be bound in the same way.
@@ -106,8 +104,9 @@ bindStmt pp s = do
   ts <- matchStmt pp s
   tryAny [bind pp t | t <- ts]
 
-ifHasAttrBoth :: PrePost -> IVar -> IAttr -> Block -> Block -> CM Types
-ifHasAttrPlus :: PrePost -> IVar -> IAttr -> Block -> CM Types
+ifHasAttrBoth  :: PrePost -> IVar -> IAttr -> Block -> Block -> CM Types
+ifHasAttrPlus  :: PrePost -> IVar -> IAttr -> Block -> CM Types
+ifHasAttrMinus :: PrePost -> IVar -> IAttr -> Block -> CM Types
 
 ifHasAttrBoth pp@(PrePost _ cs) x a b1 b2 = do
   xId <- freshPtr
@@ -129,7 +128,8 @@ ifHasAttrBoth pp@(PrePost _ cs) x a b1 b2 = do
   elseStarter x xId a aId = PrePost (starterOptional  x xId a aId)
                                     (starterForbidden x xId a aId)
 
-starterRequired, starterOptional, starterForbidden :: IVar -> Ptr -> IAttr -> Ptr -> Constraints
+type Starter = IVar -> Ptr -> IAttr -> Ptr -> Constraints
+starterRequired, starterOptional, starterForbidden :: Starter
 
 starterOptional  x xId a aId =
   Map.fromList [ toSingletonRec env x xId
@@ -144,16 +144,15 @@ starterForbidden x xId a aId =
                , (xId, tOrFromTRec $ Map.singleton a  Forbidden    )
                ]
 
-ifHasAttrPlus pp@(PrePost _ cs) x a b = do
+ifHasAttrPlus  = ifHasAttrStar starterRequired  
+ifHasAttrMinus = ifHasAttrStar starterForbidden
+
+ifHasAttrStar :: Starter -> PrePost -> IVar -> IAttr -> Block -> CM Types
+ifHasAttrStar starter pp@(PrePost _ cs) x a b = do
   xId <- freshPtr
   aId <- freshPtr
-  t   <- bindPP pp (starter x xId a aId)
+  t   <- bindPP pp (PrePost (starter x xId a aId) (starter x xId a aId))
   bindTypeBlock t b
-
-  where 
-  starter :: IVar -> Ptr -> IAttr -> Ptr -> PrePost
-  starter x xId a aId = PrePost (starterRequired  x xId a aId)
-                                (starterRequired  x xId a aId)
 
 isBool :: IVar -> Ptr -> PrePost
 isBool x xId = PrePost cs cs
