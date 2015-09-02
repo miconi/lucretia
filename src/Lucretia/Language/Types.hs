@@ -157,14 +157,6 @@ type PrePosts = [PrePost]
 instance Show PrePost where
   show = showPrePost
 
--- TODO RTR with Conditions in place of Constraints:
--- data Conditions = Conditions { _environment :: TRec
---                              , _constraints :: Constraints
---                              }
--- + no special handling in renaming
--- + no special entry in emptyConstraints
--- + no assertions in getEnv, fromEnv
-
 $(makeLens ''PrePost)
 
 emptyPrePost :: PrePost

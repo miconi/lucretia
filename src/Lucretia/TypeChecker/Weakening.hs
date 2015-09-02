@@ -86,10 +86,10 @@ wTSingle isRecFresh (Just (TRec s)) (Just (TRec s')) = do
   return $ if Map.null attributesToAdd
               then Nothing
               else Just $ TRec attributesToAdd
-wTSingle isRecFresh Nothing _ = return Nothing -- HERE Q: why Nothing as the left parameter?
+wTSingle _ Nothing _ = return Nothing
 -- cannot be otherwise since:
 -- * types in "m :: TOr" are subset of types in "m' :: TOr": Set.isSubsetOf `on` Map.keys $ m m'
--- * "w isRecFresh" on "Maybe TSingle" parameters are TRecs: rec <- (w isRecFresh `on` Map.lookup KRec) m m'
+-- * "wTSingle" parameters are TRecs: rec <- (wTSingle isRecFresh `on` Map.lookup KRec) m m'
 
 --instance Weaker (Maybe TAttr) where
 wTAttr :: Maybe Bool -> Maybe TAttr -> Maybe TAttr -> CM (Maybe TAttr)

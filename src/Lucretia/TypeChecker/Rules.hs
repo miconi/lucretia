@@ -49,7 +49,7 @@ bindCsBlock cs = bindTypeBlock (undefinedId, PrePost emptyConstraints cs)
 -- B ...
 -- B xN
 --   x
-bindTypeBlock :: Type -> Block -> CM Types -- TODO OPT RTR Ptr to (Maybe Ptr)
+bindTypeBlock :: Type -> Block -> CM Types
 bindTypeBlock t [] = return [t]
 bindTypeBlock (_, pp) (s:ss) = do
   ts <- bindStmt pp s
@@ -83,7 +83,6 @@ bindPP ppCall ppDecl = bind ppCall (undefinedId, ppDecl)
 bindStmt :: PrePost -> Stmt -> CM Types
 
 -- Binding statements inside an if statement is handled in a special way. Other statements are handled by matchStmt function.
--- TODO If can be an expression
 bindStmt pp (If x b1 b2) = do
   xId <- freshPtr
   t@(_, PrePost _ cs) <- bindPP pp (isBool x xId)
@@ -290,7 +289,6 @@ matchExp (PrePost _ cs) (EFunCall f xsCall) = do
         ("Function "++f++" is applied to "++show (length xsCall)++" argument(s), but "++show (length tsDecl)++" argument(s) should be provided.\n")
 
 
--- TODO implement TFunOr
 matchExp _ (EFunDef argNames maybeSignature funBody) = do
   funType <- case maybeSignature of
     []        -> inferSignature argNames funBody
