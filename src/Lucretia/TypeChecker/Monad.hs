@@ -25,13 +25,9 @@ import Lucretia.Language.Definitions ( Ptr, ErrorMsg )
 
 
 type CM = StateT CheckerState (ErrorT ErrorMsg Identity)
-type CML = ListT CM
 
 evalCM :: CM a -> Either ErrorMsg a
 evalCM m = runIdentity $ runErrorT $ evalStateT m initState
-
-evalCML :: CML a -> Either ErrorMsg [a]
-evalCML = evalCM . runListT
 
 -- ** Fresh variables (not in wp)
 -- New variable names are always fresh, thus there is no need

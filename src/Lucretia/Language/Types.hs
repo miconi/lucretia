@@ -152,7 +152,6 @@ data PrePost = PrePost { _pre  :: Constraints
                        , _post :: Constraints
                        }
                  deriving ( Eq, Ord )
-type PrePosts = [PrePost]
 
 instance Show PrePost where
   show = showPrePost
