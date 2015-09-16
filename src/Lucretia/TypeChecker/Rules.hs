@@ -291,17 +291,17 @@ matchExp (PrePost _ cs) (EFunCall f xsCall) = do
 
 matchExp _ (EFunDef argNames maybeSignature funBody) = do
   funType <- case maybeSignature of
-    []        -> inferSignature argNames funBody
-    signature -> checkSignature signature
+    []        -> inferSignature funBody argNames
+    signature -> checkSignature funBody signature
   postPointer $ tOrFromTFun funType
 
   where
     -- All declared signatures must be valid, so we use mapM instead of tryAny.
-    checkSignature :: TFun -> CM TFun
-    checkSignature = mapM checkSingleSignature
+    checkSignature :: Block -> TFun -> CM TFun
+    checkSignature funBody = mapM $ checkSingleSignature funBody
 
-    checkSingleSignature :: TFunSingle -> CM TFunSingle
-    checkSingleSignature decl = do
+    checkSingleSignature :: Block -> TFunSingle -> CM TFunSingle
+    checkSingleSignature funBody decl = do
       -- pre- & post- constraints must be declared in the code
       -- that should be checked by Lucretia parser
       -- case maybePPDecl of
@@ -351,8 +351,8 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
       applyRenaming renaming csInfered `checkWeaker` csDecl
             
 
-    inferSignature :: [IVar] -> Block -> CM TFun
-    inferSignature argNames funBody = do
+    inferSignature :: Block -> [IVar] -> CM TFun
+    inferSignature funBody argNames = do
       inferedTs <- bindBlock funBody
 
       -- When infering a function signature we only allow a situation when all
