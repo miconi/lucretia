@@ -28,7 +28,7 @@ import Lucretia.Language.Types
 import Lucretia.TypeChecker.Monad ( error, freshPtr, tryAny, CM )
 import Lucretia.TypeChecker.Renaming ( applyRenaming, freeVariables, getRenamingOnEnv, getRenaming, getRenamingPP, Renaming, RenamingType(..) )
 import Lucretia.TypeChecker.Update ( merge, update )
-import Lucretia.TypeChecker.Weakening ( checkWeaker, weaker )
+import Lucretia.TypeChecker.Weakening ( funDefWeaker, funAppWeaker )
 
 liftList :: (Monad m) => [a] -> ListT m a
 liftList = ListT . return
@@ -61,7 +61,7 @@ bind ppCall (iDecl, ppDecl) = do
   renaming      <- getRenamingOnEnv (BindRenaming fresh) (_post ppCall) (_pre ppDecl)
   let ppRenamed  = applyRenaming renaming ppDecl
 
-  toWeaken      <- weaker fresh (_post ppCall) (_pre ppRenamed)
+  toWeaken      <- funAppWeaker fresh (_post ppCall) (_pre ppRenamed)
   -- Using Monotonicity (Principle 1 in paper) here:
   preMerged     <- toWeaken `update` _pre ppCall
   -- Q why not:    toWeaken `update` _post ppCall
@@ -73,9 +73,8 @@ bind ppCall (iDecl, ppDecl) = do
          , PrePost preMerged postMerged
          )
 
-  where
-  freshPtrs :: PrePost -> Set Ptr
-  freshPtrs pp = (Set.difference `on` freeVariables) (_post pp) (_pre pp)
+freshPtrs :: PrePost -> Set Ptr
+freshPtrs pp = (Set.difference `on` freeVariables) (_post pp) (_pre pp)
 
 bindPP :: PrePost -> PrePost -> CM Type
 bindPP ppCall ppDecl = bind ppCall (undefinedId, ppDecl)
@@ -328,8 +327,11 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
           checkEmptyPreEnv ppInfered
           let ppInferedNoEnv = eraseEnv ppInfered
 
-          checkPre ppInherited ppInferedNoEnv
-          checkPost argTypes iInfered (_post ppInferedNoEnv) iDecl (_post ppInherited)
+          checkPre ppInferedNoEnv
+          let fresh = freshPtrs ppInfered
+          checkPost fresh argTypes
+                          iInfered (_post ppInferedNoEnv)
+                          iDecl (_post ppInherited)
 
         -- | Add a prefix "S" to all the type variables so that their names do
         -- not clash with the fresh variables used later on.
@@ -339,17 +341,16 @@ matchExp _ (EFunDef argNames maybeSignature funBody) = do
           let renaming = Set.map (\id -> ("S"++id, id)) usedPtrs in
           applyRenaming renaming t
 
-    checkPre = checkWeaker `on` _pre
+    checkPre ppInferedNoEnv = (_pre ppInferedNoEnv == Map.empty) `orFail` ("There were following references to attributes undefined in the preconstraints in the declared signature of a function: "++(showConstraints $ _pre ppInferedNoEnv))
 
-    checkPost :: [Ptr] -> Ptr -> Constraints -> Ptr -> Constraints -> CM ()
-    checkPost argTypes iInfered csInfered iDecl csDecl = do
+    checkPost :: Set Ptr -> [Ptr] -> Ptr -> Constraints -> Ptr -> Constraints -> CM ()
+    checkPost fresh argTypes iInfered csInfered iDecl csDecl = do
       renaming <- getRenaming FullRenaming
                               (iDecl   :argTypes, csDecl   )
                               (iInfered:argTypes, csInfered)
       (iDecl == applyRenaming renaming iInfered)
         `orFail` ("Returned type of a function was declared "++iDecl++" but it is "++iInfered)
-      applyRenaming renaming csInfered `checkWeaker` csDecl
-            
+      funDefWeaker fresh (applyRenaming renaming csInfered) csDecl
 
     inferSignature :: Block -> [IVar] -> CM TFun
     inferSignature funBody argNames = do

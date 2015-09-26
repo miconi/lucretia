@@ -46,7 +46,7 @@ outputTypeTestsData =
   , ($(nv 'bGetUndefinedVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: X}]")
   , ($(nv 'bGetUndefinedVar2), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {y: Y}]")
   , ($(nv 'bNew), "X with Constraints: [Env < {}, X < {}]")
-  , ($(nv 'bGetUndefinedAttr), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {}, X < {a: Y}]")
+  , ($(nv 'bGetUndefinedAttr), "Error: Attribute is required but it was not defined.")
   , ($(nv 'bGetAttr_noVar), "Error: Inside the main programme body a variable was referenced which may be undefined. The preconstraints were: [Env < {x: Y}, Y < {a: X}]")
   , ($(nv 'bGetAttr_varNotRec), "Error: Type: int should be weaker (have less possible types) then: {a: Y}")
   , ($(nv 'bSetAttr_xa), "Z with Constraints: [Env < {x: X}, X < {a: Z}, Z < int]")
@@ -61,8 +61,8 @@ outputTypeTestsData =
   , ($(nv 'bFun_identitySetFields), "F with Constraints: [Env < {identitySetFields: F}, F < func (C, D, E) [C < {}] -> C [C < {a: D, b: E}]]")
   , ($(nv 'bFun_withSignature_identity), "Z with Constraints: [Env < {identity: Z}, Z < func (Y) [] -> Y []]")
   , ($(nv 'bFun_withSignature_identitySetFields), "F with Constraints: [Env < {identitySetFields: F}, F < func (C, D, E) [C < {}] -> C [C < {a: D, b: E}]]")
-  , ($(nv 'bFun_withSignature_tooStrongPre), "Error: Constraints: [] should be weaker or equal to [SX < {a: X}]")
-  , ($(nv 'bFun_withSignature_tooStrongPost), "Error: Constraints: [] should be weaker or equal to [SX < {a: SY}]")
+  , ($(nv 'bFun_withSignature_tooStrongPre), "Error: There were following references to attributes undefined in the preconstraints in the declared signature of a function: [SX < {a: X}]")
+  , ($(nv 'bFun_withSignature_tooStrongPost), "Error: The list of type pointer names should be the same in actual and declared function postconstraints: [] and [SX < {a: SY}]")
   , ($(nv 'bFun_identityNested), "Error: Please declare signature for the function identity. Infering type of a function passed as a parameter to another function (higher order function type inference) is not supported yet.")
   , ($(nv 'bFun_withSignature_identityNested), "A with Constraints: [A < func (Z, Y) [Y < func (Z) [] -> Z []] -> Z [Y < func (Z) [] -> Z []], Env < {identityNested: A}]")
   , ($(nv 'bCall_identity), "A with Constraints: [A < int, Env < {i: A, identity: Z}, Z < func (Y) [] -> Y []]")
@@ -90,8 +90,8 @@ outputTypeTestsData =
   , ($(nv 'bIf_reassignInOneBranchWithNewCreatedOutsideOfIf_inFunction), "Error: Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).")
   , ($(nv 'bIf_reassignInBothBranchesWithNew_inFunction), "J with Constraints: [Env < {f: F, xx: G}, F < func (C) [] -> E [D < bool, E < {}], G < {}, I < bool, J < {}]")
   , ($(nv 'bIf_reassignInOneBranchWithTheSameVar_inFunction), "E with Constraints: [D < func (B) [] -> B [C < bool], E < {}, Env < {f: D, xx: E}, G < bool]")
-  , ($(nv 'bIfHasAttr_attributeUndefined), "undefinedId with Constraints: [Env < {x: X}, X < {forbidden a}]")
-  , ($(nv 'bIfHasAttr_attributeUndefined_setAttrInElse), "H with Constraints: [Env < {x: X}, H < int, X < {forbidden a, b: H}]")
+  , ($(nv 'bIfHasAttr_attributeUndefined), "undefinedId with Constraints: [Env < {x: X}, X < {optional a: Z}] AND undefinedId with Constraints: [Env < {x: X}, X < {forbidden a}]")
+  , ($(nv 'bIfHasAttr_attributeUndefined_setAttrInElse), "F with Constraints: [Env < {x: X}, F < int, X < {forbidden a, b: F}]")
   , ($(nv 'bIfHasAttr_attributeDefined), "undefinedId with Constraints: [Env < {x: X}, X < {optional a: Z}, Z < int] AND undefinedId with Constraints: [Env < {x: X}, X < {a: Z}, Z < int]")
   , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInThen), "undefinedId with Constraints: [B < int, Env < {cond: Y, x: X}, X < {optional a: B, optional b: B}, Y < bool]")
   , ($(nv 'bIfHasAttr_attributeMaybeDefined_usedInElse), "Error: No typing path has succeeded: [\"Attribute is required but it was not defined.\",\"Possibly undefined variable was referenced. Cannot merge a fresh type pointer (i.e. created inside an if instruction) with a stale type pointer (i.e. one that should be created before the if instruction, to make sure that the referenced variable is defined).\",\"Attribute is forbidden but it may have been defined.\"]")
@@ -103,8 +103,8 @@ outputTypeTestsData =
   , ($(nv 'bCall_withTwoSignatures_intersectionExample_firstSignature), "N with Constraints: [Env < {f: J, xx: K, yy: L}, J < func (H, I) [H < {}, I < {a: G}] -> G [F < int, H < {a: F}, I < {a: G}] and (H, H) [H < {}] -> F [F < int, H < {a: F}], K < {a: O}, L < {a: N}, N < bool, O < int]")
   , ($(nv 'bCall_withTwoSignatures_intersectionExample_secondSignature), "P with Constraints: [Env < {f: J, xx: K}, J < func (H, I) [H < {}, I < {a: G}] -> G [F < int, H < {a: F}, I < {a: G}] and (H, H) [H < {}] -> F [F < int, H < {a: F}], K < {a: P}, P < int]")
   , ($(nv 'bCall_withTwoSignatures_intersectionExample_secondSignature_badArgs), "Error: No typing path has succeeded: [\"Type: int should be weaker (have less possible types) then: {a: M}\",\"Type: int should be weaker (have less possible types) then: {}\"]")
-  , ($(nv 'bFun_withTwoSignatures_tooStrongPre), "Error: Constraints: [] should be weaker or equal to [SX < {a: X}]")
-  , ($(nv 'bFun_withTwoSignatures_bothGood), "G with Constraints: [Env < {f: F, xx: G}, F < func (E) [E < {}] -> E [E < {}] and (E) [E < {}] -> E [D < int, E < {a: D}], G < {}] AND G with Constraints: [Env < {f: F, xx: G}, F < func (E) [E < {}] -> E [E < {}] and (E) [E < {}] -> E [D < int, E < {a: D}], G < {a: I}, I < int]")
+  , ($(nv 'bFun_withTwoSignatures_tooStrongPre), "Error: There were following references to attributes undefined in the preconstraints in the declared signature of a function: [SX < {a: X}]")
+  , ($(nv 'bFun_withTwoSignatures_tooWeakPost), "Error: The list of type pointer names should be the same in actual and declared function postconstraints: [SX < {a: Y}, Y < int] and [SX < {}]")
   -- , ($(nv '), "C")
   ]
 
@@ -648,7 +648,7 @@ csEmptyRec       = (Map.singleton "X" tOrEmptyRec)
 csRecWithOneAttr = (Map.fromList [ ("X", (tOrSingletonRec "a" "I"))
                                  , ("I", (tOrPrimitive KInt))
                                  ])
-bFun_withTwoSignatures_bothGood =
+bFun_withTwoSignatures_tooWeakPost =
   [ SetVar "f" $
       EFunDef ["x"]
       [ TFunSingle ["X"] "X" (DeclaredPP $ PrePost csEmptyRec csEmptyRec)
