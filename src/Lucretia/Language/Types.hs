@@ -19,11 +19,8 @@ import Util.OrFail ( orFail )
 
 import Lucretia.Language.Definitions
 
-import Data.Lens (Lens, mapLens, getL)
-import Data.Lens.Template (makeLens)
 import Prelude hiding ((.))
 import Control.Category ((.))
-import Util.MapLenses (mapInsertLens)
 
 
 -- * Show instance
@@ -155,8 +152,6 @@ data PrePost = PrePost { _pre  :: Constraints
 
 instance Show PrePost where
   show = showPrePost
-
-$(makeLens ''PrePost)
 
 emptyPrePost :: PrePost
 emptyPrePost = PrePost emptyConstraints emptyConstraints
